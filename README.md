@@ -79,6 +79,12 @@ npm run dev
 
 ---
 
+## 📖 Architecture & Technical Article
+Want to know how we crushed network latency and solved TCP Coalescing false positives? Read our deep-dive engineering case study:
+👉 [**How We Built an Ultra-Low Latency Security Proxy in Rust & Python**](https://dev.to/mmrobeertoops/how-we-built-an-ultra-low-latency-security-proxy-in-rust-python-2pan)
+
+---
+
 ## 💎 Núcleo abierto: Comunidad vs. Empresa
 
 Este repositorio contiene la **Edición Comunitaria** de Q-Guard (Licencia Apache 2.0), totalmente funcional para desarrollo local y pequeñas arquitecturas.
