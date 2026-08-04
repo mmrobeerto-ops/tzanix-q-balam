@@ -66,6 +66,10 @@ class QGuardSidecar:
         return obfuscated
 
     def check_anomaly_atr(self, x_vector: str, y_magnitude: int) -> bool:
+        # Calibración: Ignorar fluctuaciones si el volumen total es muy pequeño
+        # (TCP Coalescing junta paquetes, pero si no supera 8KB, no es exfiltración)
+        MIN_ANOMALY_THRESHOLD = 8192
+        
         history = self.connection_history[x_vector]
         if len(history) < 3:
             history.append(y_magnitude)
@@ -77,7 +81,9 @@ class QGuardSidecar:
             atr = 1.0 
             
         upper_band = sma + (self.ATR_MULTIPLIER * atr)
-        if y_magnitude > upper_band:
+        
+        # Kill-Switch: Solo actuar si supera el umbral matemático Y el umbral físico de red
+        if y_magnitude > upper_band and y_magnitude > MIN_ANOMALY_THRESHOLD:
             logging.warning(f"¡ANOMALÍA DETECTADA! (Kill-Switch) IP: {x_vector} | Magnitud: {y_magnitude} | Límite: {upper_band:.2f}")
             return True 
             

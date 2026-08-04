@@ -1,62 +1,70 @@
-# TZANiX Q-Guard (Community Edition)
+# TZANiX Q-Guard (Edición Comunitaria)
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![Status](https://img.shields.io/badge/status-Alpha-orange.svg)
+![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Rust Engine](https://img.shields.io/badge/Rust_Core-v0.2.0-orange)
+![Build](https://img.shields.io/badge/Build-Passing-brightgreen)
 
-Q-Guard is an advanced post-quantum auditing and obfuscation middleware. It is designed to mitigate the **"Harvest Now, Decrypt Later"** threat by injecting mathematical entropy into data streams and detecting massive exfiltration attempts in real-time.
+Q-Guard es un middleware avanzado de ofuscación y auditoría post-cuántica. Está diseñado para mitigar la amenaza de **"Cosechar Ahora, Desencriptar Después"** inyectando entropía matemática en los flujos de datos y detectando intentos de exfiltración masiva en tiempo real.
 
-## The Problem
-Adversaries are currently intercepting and storing encrypted data (Harvest Now) with the intention of decrypting it once quantum computers break current RSA/ECC standards (Decrypt Later). Upgrading an entire infrastructure to NIST post-quantum algorithms takes years. 
+## El Problema
+Los adversarios actualmente interceptan y almacenan datos encriptados (Cosechar Ahora) con la intención de desencriptarlos una vez que las computadoras cuánticas rompan los estándares RSA/ECC actuales (Desencriptar Después). Actualizar toda una infraestructura a algoritmos post-cuánticos NIST lleva años.
 
-## The Solution: Q-Guard
-Q-Guard acts as a lightweight **Sidecar Proxy**. You place it between your application and your database without changing a single line of your core business logic.
+## La Solución: Q-Guard
+Q-Guard actúa como un **Sidecar Proxy** ligero. Lo colocas entre tu aplicación y tu base de datos sin cambiar una sola línea de tu lógica de negocio central.
 
-It operates on the **Tesseract Model ($X, Y, Z, T$)**:
-*   **$X$ (Source Vector):** The IP and port of the client.
-*   **$Y$ (Magnitude):** The volume of data requested.
-*   **$Z$ (Entropy):** The mathematical noise injected to obfuscate the data.
-*   **$T$ (Time):** The latency and timestamp.
+Funciona según el Modelo Topológico 4D ($[X, Y, Z, T]$):
+* **$X$ (Vector de Origen)**: IP/Puerto del cliente.
+* **$Y$ (Magnitud)**: Volumen de datos solicitados.
+* **$Z$ (Entropía)**: Ruido matemático inyectado para ofuscar el patrón de exfiltración.
+* **$T$ (Tiempo)**: Latencia y marca de tiempo.
 
-By analyzing the Average True Range (ATR) of the $Y$ magnitude over time, Q-Guard detects volumetric anomalies (massive exfiltrations) and triggers a **Kill-Switch** to sever the connection instantly.
+Al analizar el Rango Verdadero Promedio (ATR) de la magnitud $Y$ a lo largo del tiempo, Q-Guard detecta anomalías volumétricas (exfiltraciones masivas) y activa un **Kill-Switch** para cortar la conexión instantáneamente.
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
-### 1. Run the Proxy
+### 1. Ejecutar el Proxy
 ```bash
 python src/proxy.py
 ```
-The proxy will listen on `127.0.0.1:8080` and forward traffic to `127.0.0.1:9000`.
+El proxy escuchará en `127.0.0.1:8080` y reenviará el tráfico a `127.0.0.1:9000`.
 
-### 2. Run the Validation Suite
-We include a battery of tests in the `/tests` folder to prove Q-Guard's resilience. Open multiple terminal tabs and run:
+### 2. Ejecutar la Suite de Validación
+Incluimos una batería de pruebas en la carpeta `/tests` para demostrar la resiliencia de Q-Guard. Abre múltiples pestañas de terminal y ejecuta:
 
 ```bash
-# Start a dummy target database on port 9000
+# Iniciar una base de datos objetivo en el puerto 9000
 python tests/target_server.py
 
-# Launch a volumetric attack to test the ATR Kill-Switch
+# Lanzar un ataque volumétrico para probar el Kill-Switch ATR
 python tests/stress_tester.py
 
-# Simulate an interception to audit the Shannon Entropy
+# Simular una interceptación para auditar la Entropía de Shannon
 python tests/entropy_auditor.py
 
-# Fuzz the proxy to ensure Fail-Safe resilience
+# Fuzzeo al proxy para garantizar la resiliencia Fail-Safe
 python tests/fuzzer.py
 
-# Run the End-to-End A/B Validation Benchmark (Pure Python vs TZANiX Rust Core)
+# Ejecutar el Benchmark A/B End-to-End (Python Puro vs TZANiX Rust Core)
 python tests/benchmark_e2e.py
 ```
 
-### 🏆 Benchmark de Impacto B2B (TZANiX Swarm Engine)
-Nuestra integración con el motor `tzanix-core` logra un desempeño industrial masivo en capa de red:
-* **Latencia Media**: -88.4% de reducción (De 50.5 ms en Python puro a **5.8 ms** con Rust).
-* **Consumo de CPU**: Eliminación completa del cuello de botella (0.0% CPU I/O bound vs picos en Python).
-* **Escalabilidad**: Absorbe picos de ataques bloqueando a los intrusos sin estrangular conexiones legítimas gracias a su **Swarm Buffer** y *Flush Latch* dinámico.
+### 🏆 Benchmark de Impacto E2E (Red TCP Real)
+
+Sometimos a Q-Guard a una prueba de estrés I/O bajo tráfico masivo de conexiones TCP concurrentes, comparando la inspección en Python Puro vs. **TZANiX Swarm Engine (Rust)**:
+
+| Métrica | Legacy (Python Puro) | TZANiX Swarm (Rust) | Impacto |
+| :--- | :--- | :--- | :--- |
+| **Latencia Media** | 50.56 ms | **5.87 ms** | 📉 **88.4% de reducción** |
+| **Latencia Máxima (Spikes)** | 199.48 ms | **20.31 ms** | 🛡️ **89.8% de estabilización** |
+| **Uso de Memoria RAM** | 31.89 MB | **31.77 MB** | ⚡ **Consumo estático** |
+
+> **💡 Ventaja en Ciberseguridad:** Al eliminar el *lag* de procesamiento en la capa de inspección, el Kill-Switch basado en ATR detecta y neutraliza ráfagas de exfiltración volumétrica en milisegundos sin estrangular conexiones legítimas.
 
 ### 3. Dashboard (UI)
-A React-based visual dashboard is available in the `/dashboard` directory.
+Un panel visual basado en React está disponible en el directorio `/dashboard`.
 ```bash
 cd dashboard
 npm install
@@ -65,18 +73,13 @@ npm run dev
 
 ---
 
-## 💎 Open Core: Community vs Enterprise
+## 💎 Núcleo abierto: Comunidad vs. Empresa
 
-This repository contains the **Community Edition** of Q-Guard, released under the Apache 2.0 license. It is fully functional and open for peer review and community contributions.
+Este repositorio contiene la **Edición Comunitaria** de Q-Guard (Licencia Apache 2.0), totalmente funcional para desarrollo local y pequeñas arquitecturas.
 
-**TZANiX Q-Guard Enterprise Edition** is our commercial offering for Fintech, Quantitative Funds, and high-security sectors. It includes:
-- Advanced Machine Learning anomaly detection (beyond basic SMA/ATR).
-- Production-grade Kubernetes sidecar injection.
-- Seamless integration with major SQL/NoSQL databases.
-- Real-time SIEM integration.
-- 24/7 Enterprise Support.
+Para despliegues de alto rendimiento, soporte dedicado o integración en clusters de Kubernetes:
+* ✉️ **Contacto Directo / Enterprise:** mmrobeerto@gmail.com
+* 📦 **Motor Acelerado:** Integrado vía `tzanix-core` (PyPI)
 
-For enterprise inquiries, please visit our website.
-
-## 🤝 Contributing
-We welcome community contributions! Please read `CONTRIBUTING.md` before submitting a Pull Request.
+## 🤝 Contribuyendo
+¡Damos la bienvenida a las contribuciones de la comunidad! Por favor, lee `CONTRIBUTING.md` antes de enviar un Pull Request.
