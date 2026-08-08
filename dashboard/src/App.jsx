@@ -219,7 +219,7 @@ function App() {
     const coreRef = coreMesh;
 
     // 3. Lazos de Datos (Líneas Vectoriales Dinámicas)
-    const linksCount = 60;
+    const linksCount = 100; // Incrementado para mayor conexión
     const linksGeo = new THREE.BufferGeometry();
     const linksPos = new Float32Array(linksCount * 6);
     for(let i=0; i<linksCount; i++) {
@@ -231,7 +231,7 @@ function App() {
         linksPos[i*6+3] = d2.x; linksPos[i*6+4] = d2.y; linksPos[i*6+5] = d2.z;
     }
     linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPos, 3));
-    const linksMat = new THREE.LineBasicMaterial({ color: 0x10ff88, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false });
+    const linksMat = new THREE.LineBasicMaterial({ color: 0x10ff88, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
     const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMat);
     scene.add(dataLinksMesh);
 
@@ -309,10 +309,10 @@ function App() {
         // LAZOS DE DATOS DINÁMICOS
         if (gate === 'GATE2_ATTACK') {
             linksMat.color.setHex(0xff2e63);
-            linksMat.opacity = Math.random() * 0.8;
+            linksMat.opacity = Math.random() * 0.9 + 0.1;
         } else {
             linksMat.color.setHex(0x10ff88); // Jade Brillante
-            linksMat.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.3; // Parpadeo estilo fibra óptica
+            linksMat.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.6; // Parpadeo más visible
         }
 
         // TRÁNSITO INBOUND
@@ -479,16 +479,16 @@ function App() {
             <stop offset="100%" stopColor={isAlertColor ? "#FF2E63" : "#00F0FF"} />
           </linearGradient>
           <linearGradient id="gradientFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={isAlertColor ? "rgba(255, 46, 99, 0.35)" : "rgba(0, 229, 255, 0.25)"} />
+            <stop offset="0%" stopColor={isAlertColor ? "rgba(255, 46, 99, 0.45)" : "rgba(0, 240, 255, 0.25)"} />
             <stop offset="100%" stopColor="transparent" />
           </linearGradient>
           <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feGaussianBlur stdDeviation="4" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
         <path fill="url(#gradientFill)" d={fillD} style={{ transition: 'fill 0.3s ease' }} />
-        <path fill="none" stroke="url(#gradientLine)" strokeWidth="1.2" d={pathD} filter="url(#neonGlow)" style={{ transition: 'stroke 0.3s ease' }} />
+        <path fill="none" stroke="url(#gradientLine)" strokeWidth="2.5" d={pathD} filter="url(#neonGlow)" style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
     );
   };
@@ -567,8 +567,7 @@ function App() {
 
           {/* CENTER ACTIONS */}
           <div className="center-actions">
-            
-             <div className="simulation-controls">
+            <div className="toolbar-panel glass-panel">
                {mode === 'PROD' && (
                   <input 
                     className="ws-input" 
@@ -578,21 +577,21 @@ function App() {
                   />
                )}
                {mode === 'DEMO' && (
-                  <button className="action-btn demo-toggle-btn" onClick={() => setDemoRunning(!demoRunning)}>
-                    {demoRunning ? '[ PAUSAR SIMULACIÓN ]' : '[ INICIAR SIMULACIÓN ]'}
+                  <button className="toolbar-btn green-btn" onClick={() => setDemoRunning(!demoRunning)}>
+                    {demoRunning ? '⏸ PAUSAR SIMULACIÓN' : '▶ INICIAR SIMULACIÓN'}
                   </button>
                )}
-             </div>
+               
+               <div className="separator-v"></div>
 
-             <div className="gates-panel">
                <button 
-                 className={`action-btn alert-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
+                 className={`toolbar-btn red-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
                  onClick={() => executeGate2()}
                  disabled={!!activeGate}
                >
-                 {activeGate ? '[ SISTEMA EN RESPUESTA ]' : '[ SIMULAR ATAQUE ]'}
+                 {activeGate ? '🛡 SISTEMA EN RESPUESTA' : '⚠ SIMULAR ATAQUE'}
                </button>
-             </div>
+            </div>
           </div>
           
         </div>

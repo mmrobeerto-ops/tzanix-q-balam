@@ -201,30 +201,61 @@ body {
   bottom: 1.5rem;
   transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  justify-content: center;
   width: 100%;
-  pointer-events: none; /* Para no bloquear clics del canvas */
+  pointer-events: none;
 }
 
-.center-actions > * {
-  pointer-events: auto; /* Reactivar clics en los botones */
-}
-
-.gates-panel {
+.toolbar-panel {
   display: flex;
   flex-direction: row;
-  justify-content: center;
+  align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
-  width: 100%;
+  background: rgba(10, 14, 23, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  pointer-events: auto;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
 }
 
-.demo-toggle-btn {
-  color: #00FFA3;
-  border-color: rgba(0, 255, 163, 0.5);
+.toolbar-btn {
+  background: transparent;
+  font-family: inherit;
   font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.toolbar-btn.green-btn {
+  color: #10FF88;
+}
+.toolbar-btn.green-btn:hover {
+  background: rgba(16, 255, 136, 0.15);
+}
+
+.toolbar-btn.red-btn {
+  color: #FF2E63;
+}
+.toolbar-btn.red-btn:hover:not(.disabled) {
+  background: rgba(255, 46, 99, 0.15);
+}
+
+.toolbar-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.separator-v {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .action-btn {
