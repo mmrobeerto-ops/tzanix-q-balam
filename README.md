@@ -1,57 +1,58 @@
-# TZANiX Q-Guard (Edición Comunitaria)
+# TZANiX Q-Guard + Quantum Engine (Edición Comunitaria)
 
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Rust Engine](https://img.shields.io/badge/Rust_Core-v0.2.0-orange)
-![Build](https://img.shields.io/badge/Build-Passing-brightgreen)
+![Quantum Engine](https://img.shields.io/badge/Frontend-WASM_3D-purple)
 
-Q-Guard es un middleware avanzado de ofuscación y auditoría post-cuántica. Está diseñado para mitigar la amenaza de **"Cosechar Ahora, Desencriptar Después"** inyectando entropía matemática en los flujos de datos y detectando intentos de exfiltración masiva en tiempo real.
+**El Firewall Cuántico con la Visualización Holográfica más avanzada del mercado.**
 
-## El Problema
-Los adversarios actualmente interceptan y almacenan datos encriptados (Cosechar Ahora) con la intención de desencriptarlos una vez que las computadoras cuánticas rompan los estándares RSA/ECC actuales (Desencriptar Después). Actualizar toda una infraestructura a algoritmos post-cuánticos NIST lleva años.
+TZANiX es una plataforma dual diseñada para mitigar la amenaza de **"Cosechar Ahora, Desencriptar Después"** (Harvest Now, Decrypt Later). Protege bases de datos inyectando entropía y bloqueando exfiltraciones masivas en milisegundos, al mismo tiempo que vuelve visible lo invisible a través de una matriz 3D en tiempo real.
 
-## La Solución: Q-Guard
-Q-Guard actúa como un **Sidecar Proxy** ligero. Lo colocas entre tu aplicación y tu base de datos sin cambiar una sola línea de tu lógica de negocio central.
+## La Arquitectura Definitiva: Fusión Mastermind
 
-Funciona según el Modelo Topológico 4D ($[X, Y, Z, T]$):
-* **$X$ (Vector de Origen)**: IP/Puerto del cliente.
-* **$Y$ (Magnitud)**: Volumen de datos solicitados.
-* **$Z$ (Entropía)**: Ruido matemático inyectado para ofuscar el patrón de exfiltración.
-* **$T$ (Tiempo)**: Latencia y marca de tiempo.
+TZANiX no es solo un proxy invisible en una terminal; es un ecosistema completo compuesto por dos piezas tecnológicas que se comunican a la velocidad de la luz:
 
-Al analizar el Rango Verdadero Promedio (ATR) de la magnitud $Y$ a lo largo del tiempo, Q-Guard detecta anomalías volumétricas (exfiltraciones masivas) y activa un **Kill-Switch** para cortar la conexión instantáneamente.
+### 1. TZANiX Q-Guard (El Escudo Activo / Backend)
+Escrito en Python (con núcleo acelerado en Rust), Q-Guard es el proxy inverso que está en la trinchera.
+*   **Inyección de Entropía ($Z$):** Intercepta el tráfico y añade ruido matemático para que cualquier dato robado sea ruido blanco estadísticamente indescifrable.
+*   **Filtro Volumétrico ATR:** Mide el *Average True Range* del volumen de datos ($Y$). Si detecta una exfiltración masiva (ej. ataque DDoS Slowloris o volcado masivo de base de datos), activa un **Kill-Switch** que decapita el socket TCP del atacante instantáneamente.
+
+### 2. TZANiX Quantum Engine (El Radar Holográfico / Frontend)
+Escrito en **Rust + WebAssembly + Three.js** (Próximamente integrado en este repositorio), este es el cerebro visual.
+*   Q-Guard transmite la telemetría del tráfico a través de **WebSockets** hacia el Quantum Engine.
+*   El motor renderiza a 60 FPS en el navegador una topología cuántica en 3D. Un CEO, CTO o inversor puede *ver* cómo fluyen los datos y observar en tiempo real cómo un servidor se ilumina en rojo y destruye un ataque antes de que afecte la red.
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start (Backend Actual)
 
-### 1. Ejecutar el Proxy
+### 1. Ejecutar el Escudo Q-Guard
 ```bash
 python src/proxy.py
 ```
-El proxy escuchará en `127.0.0.1:8080` y reenviará el tráfico a `127.0.0.1:9000`.
+El proxy escuchará en `127.0.0.1:8080`, reenviará el tráfico a `127.0.0.1:9000` y transmitirá telemetría vía WebSockets.
 
 ### 2. Ejecutar la Suite de Validación
-Incluimos una batería de pruebas en la carpeta `/tests` para demostrar la resiliencia de Q-Guard. Abre múltiples pestañas de terminal y ejecuta:
+Abre múltiples pestañas de terminal y ejecuta las pruebas de estrés para ver el escudo en acción:
 
 ```bash
 # Iniciar una base de datos objetivo en el puerto 9000
 python tests/target_server.py
 
-# Lanzar un ataque volumétrico para probar el Kill-Switch ATR
+# Lanzar un ataque volumétrico masivo
 python tests/stress_tester.py
 
-# Simular una interceptación para auditar la Entropía de Shannon
+# Simular interceptación (Auditoría de Entropía)
 python tests/entropy_auditor.py
 
-# Fuzzeo al proxy para garantizar la resiliencia Fail-Safe
+# Fuzzeo de capa 7 (Slowloris simulado)
 python tests/fuzzer.py
-
-# Ejecutar el Benchmark A/B End-to-End (Python Puro vs TZANiX Rust Core)
-python tests/benchmark_e2e.py
 ```
 
-### 🏆 Benchmark de Impacto E2E (Red TCP Real)
+---
+
+## 🏆 Benchmark de Impacto E2E (Red TCP Real)
 
 Sometimos a Q-Guard a una prueba de estrés I/O bajo tráfico masivo de conexiones TCP concurrentes, comparando la inspección en Python Puro vs. **TZANiX Swarm Engine (Rust)**:
 
@@ -61,37 +62,16 @@ Sometimos a Q-Guard a una prueba de estrés I/O bajo tráfico masivo de conexion
 | **Latencia Máxima (Spikes)** | 199.48 ms | **20.31 ms** | 🛡️ **89.8% de estabilización** |
 | **Uso de Memoria RAM** | 31.89 MB | **31.77 MB** | ⚡ **Consumo estático** |
 
-> **💡 Ventaja en Ciberseguridad:** Al eliminar el *lag* de procesamiento en la capa de inspección, el Kill-Switch basado en ATR detecta y neutraliza ráfagas de exfiltración volumétrica en milisegundos sin estrangular conexiones legítimas.
-
-### 🛡️ Pruebas de Resistencia Enterprise (Estabilidad B2B)
-Además del rendimiento bruto, la arquitectura ha superado pruebas de infraestructura de grado militar:
-* **Anti-Slowloris (Agotamiento de FD)**: Desconexión asíncrona estricta (`Idle Timeout: 5s`), destruyendo 50+ conexiones "zombie" concurrentes y protegiendo los sockets del sistema.
-* **Red Sucia (Jitter & TCP Coalescing)**: El *Swarm Buffer* y la capa inercial de Rust absorben payloads fragmentados asimétricos con 50ms de latencia de inyección, reensamblando el tráfico sin un solo byte corrupto.
-* **Foco de Incendio (Memory Leak Soak Test)**: Tras bombardeos sostenidos ininterrumpidos, la memoria asignada (RAM) por el puente Python-Rust (PyO3) se aplana matemáticamente en un límite de **42.2 MB** (Cero Fugas).
-
-### 3. Dashboard (UI)
-Un panel visual basado en React está disponible en el directorio `/dashboard`.
-```bash
-cd dashboard
-npm install
-npm run dev
-```
+> **💡 Ventaja:** Al eliminar el *lag* de procesamiento en la capa de inspección, el Kill-Switch ATR detecta ráfagas volumétricas en milisegundos sin estrangular conexiones legítimas, enviando esta información al instante al motor 3D.
 
 ---
 
-## 📖 Architecture & Technical Article
-Want to know how we crushed network latency and solved TCP Coalescing false positives? Read our deep-dive engineering case study:
-👉 [**How We Built an Ultra-Low Latency Security Proxy in Rust & Python**](https://dev.to/mmrobeertoops/how-we-built-an-ultra-low-latency-security-proxy-in-rust-python-2pan)
+## 💎 TZANiX Enterprise Edition: El Producto Completo
 
----
+Este repositorio contiene la base comunitaria de intercepción (Apache 2.0).
+Sin embargo, el verdadero valor comercial para bancos, exchanges y corporaciones se encuentra en **TZANiX Enterprise**.
 
-## 💎 Núcleo abierto: Comunidad vs. Empresa
+Mientras el Ingeniero de Redes utiliza la eficiencia de Q-Guard para asegurar los endpoints, los Directores de Seguridad (CISO) utilizan el **Quantum Engine 3D** desde pantallas de control para tener una consciencia situacional sin precedentes de las amenazas y bloqueos, convirtiendo datos aburridos en inteligencia de ciberseguridad premium.
 
-Este repositorio contiene la **Edición Comunitaria** de Q-Guard (Licencia Apache 2.0), totalmente funcional para desarrollo local y pequeñas arquitecturas.
-
-Para despliegues de alto rendimiento, soporte dedicado o integración en clusters de Kubernetes:
 * ✉️ **Contacto Directo / Enterprise:** mmrobeerto@gmail.com
-* 📦 **Motor Acelerado:** Integrado vía `tzanix-core` (PyPI)
-
-## 🤝 Contribuyendo
-¡Damos la bienvenida a las contribuciones de la comunidad! Por favor, lee `CONTRIBUTING.md` antes de enviar un Pull Request.
+* 📖 **Ingeniería detrás de Q-Guard:** [Deep-dive case study](https://dev.to/mmrobeertoops/how-we-built-an-ultra-low-latency-security-proxy-in-rust-python-2pan)
