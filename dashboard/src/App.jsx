@@ -189,7 +189,7 @@ function App() {
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // 1. Matriz Cuántica Densa (El Núcleo 4D)
+    // 1. Matriz Cuántica Densa (Nube)
     const particlesCount = 8000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particlesCount * 3);
@@ -219,6 +219,16 @@ function App() {
     const particlesMesh = new THREE.Points(geometry, material);
     scene.add(particlesMesh);
     pointsRef.current = particlesMesh;
+
+    // 1.5. Estructura de Red Central (El Tesseract Core)
+    const coreGeo = new THREE.IcosahedronGeometry(2, 1); // Figura facetada
+    const coreEdges = new THREE.EdgesGeometry(coreGeo);
+    const coreMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+    const coreMesh = new THREE.LineSegments(coreEdges, coreMat);
+    scene.add(coreMesh);
+    
+    // Asignar al mismo objeto de referencia para que sea afectado por el color
+    const coreRef = coreMesh;
 
     // 2. Grupo de Vectores de Ataque (Inicialmente Vacío)
     const vectorsGroup = new THREE.Group();
@@ -257,6 +267,7 @@ function App() {
         // Fase 1: Estado Seguro
         if (phase === 0 || phase === 3) {
             pointsRef.current.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
+            coreRef.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
             
             // Limpiar grupos visuales si no hay ataque
@@ -265,6 +276,10 @@ function App() {
                quarantineGroup.clear();
                localShockwave = null;
             }
+
+            // Animación suave del núcleo estructural
+            coreRef.rotation.y = elapsedTime * 0.2;
+            coreRef.rotation.x = elapsedTime * 0.1;
 
             for(let i = 0; i < particlesCount; i++) {
                 const ix = i * 3;
@@ -283,7 +298,12 @@ function App() {
         // Fase 2: Inyección de Ataque (Vectores Rojos, Deformación)
         else if (phase === 1) {
             pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+            coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
+
+            // Sacudida del núcleo
+            coreRef.rotation.y += (Math.random() - 0.5) * 0.1;
+            coreRef.rotation.x += (Math.random() - 0.5) * 0.1;
 
             // Crear vectores rojos disparándose si no existen
             if (vectorsGroup.children.length === 0) {
@@ -315,6 +335,8 @@ function App() {
         // Fase 3: Kill-Switch (Onda Blanca/Turquesa, Cuarentena)
         else if (phase === 2) {
             pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+            coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+            coreRef.rotation.y = elapsedTime * 0.2; // Vuelve a estabilizar rotación
 
             // Desaparecer vectores de ataque rotos
             vectorsGroup.children.forEach(child => {
@@ -405,6 +427,9 @@ function App() {
       
       pathD += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x1},${y1}`;
     }
+    
+    // Generar path cerrado para el degradado de relleno
+    const fillD = pathD + ` L ${width},${height} L 0,${height} Z`;
 
     const isAlertColor = attackPhase === 1 || attackPhase === 2;
 
@@ -415,8 +440,17 @@ function App() {
             <stop offset="0%" stopColor="#00F0FF" />
             <stop offset="100%" stopColor={isAlertColor ? "#FF2E63" : "#00F0FF"} />
           </linearGradient>
+          <linearGradient id="gradientFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={isAlertColor ? "rgba(255, 46, 99, 0.35)" : "rgba(0, 229, 255, 0.25)"} />
+            <stop offset="100%" stopColor="transparent" />
+          </linearGradient>
+          <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
-        <path fill="none" stroke="url(#gradientLine)" strokeWidth="2.5" d={pathD} style={{ transition: 'stroke 0.3s ease' }} />
+        <path fill="url(#gradientFill)" d={fillD} style={{ transition: 'fill 0.3s ease' }} />
+        <path fill="none" stroke="url(#gradientLine)" strokeWidth="1.2" d={pathD} filter="url(#neonGlow)" style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
     );
   };
@@ -424,8 +458,11 @@ function App() {
   const getStatusText = () => {
     if (attackPhase === 0) return 'NÚCLEO PROTEGIDO (Q-SECURE)';
     if (attackPhase === 1) return 'ANOMALÍA DETECTADA';
-    return 'EXFILTRACIÓN BLOQUEADA';
+    if (attackPhase === 2) return 'EXFILTRACIÓN BLOQUEADA';
+    return 'RESTAURANDO ESTADO...';
   };
+
+  const isAlertState = attackPhase === 1 || attackPhase === 2;
 
   return (
     <div className="dashboard-container">
@@ -440,8 +477,9 @@ function App() {
           </div>
           
           <div className="top-metrics">
-             <div className={`status-indicator ${attackPhase > 0 ? 'alert' : ''}`}>
-                ESTADO: {getStatusText()}
+             <div className={`status-pill ${isAlertState ? 'alert' : ''}`}>
+                <div className="led-dot"></div>
+                <span>ESTADO: {getStatusText()}</span>
              </div>
              <div className="separator">|</div>
              <div className="latency-indicator">LATENCY: {attackPhase === 0 ? '0.38' : '0.42'}ms</div>
@@ -467,11 +505,11 @@ function App() {
             <ul className="metrics-list">
               <li>
                 <span className="label">- Frecuencia:</span>
-                <span className="val">{attackPhase > 0 ? '98.50' : (5.00 + Math.random()*0.1).toFixed(2)} Hz</span>
+                <span className="val">{isAlertState ? '98.50' : (5.00 + Math.random()*0.1).toFixed(2)} Hz</span>
               </li>
               <li>
                 <span className="label">- Entropía:</span>
-                <span className="val">{stats.globalEntropy.toFixed(2)}</span>
+                <span className="val">{isAlertState ? '0.98' : stats.globalEntropy.toFixed(2)}</span>
               </li>
               <li>
                 <span className="label">- Conexiones:</span>
@@ -495,8 +533,12 @@ function App() {
                   {demoRunning ? '[PAUSAR DEMO]' : '[INICIAR DEMO]'}
                 </button>
              )}
-             <button className="action-btn alert-btn" onClick={triggerSimulation}>
-               [SIMULAR ATAQUE]
+             <button 
+               className={`action-btn alert-btn ${attackPhase === 0 ? 'pulse' : 'disabled'}`} 
+               onClick={triggerSimulation}
+               disabled={attackPhase !== 0}
+             >
+               {attackPhase === 0 ? '[SIMULAR ATAQUE]' : '[SISTEMA EN RESPUESTA]'}
              </button>
           </div>
           
