@@ -6,6 +6,8 @@ import collections
 import numpy as np
 import tzanix_core
 import os
+import websockets
+import json
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -25,6 +27,21 @@ class QGuardSidecar:
         self.buffer_lock = asyncio.Lock()
         self.MAX_BUFFER_SIZE = 50
         self.TOKEN_VALIDO = "434c49454e545f49443a545a414e49582d50524f2d544553547c45585049524154494f4e3a323032362d31322d3331.2bf385b34f59deb0e733485307c3712153ad7ba4e08354c1e114169a7046e80f2aa441c432f613ca52970542e022bc21e1f50b89930b406647a07c8648001301"
+
+        self.ws_clients = set()
+
+    async def ws_handler(self, websocket):
+        self.ws_clients.add(websocket)
+        try:
+            await websocket.wait_closed()
+        finally:
+            self.ws_clients.remove(websocket)
+
+    async def broadcast_ws(self, message: dict):
+        if not self.ws_clients:
+            return
+        msg = json.dumps(message)
+        websockets.broadcast(self.ws_clients, msg)
 
     async def flush_buffer(self, force=False):
         if len(self.swarm_buffer) < self.MAX_BUFFER_SIZE and not force:
@@ -85,6 +102,13 @@ class QGuardSidecar:
         # Kill-Switch: Solo actuar si supera el umbral matemático Y el umbral físico de red
         if y_magnitude > upper_band and y_magnitude > MIN_ANOMALY_THRESHOLD:
             logging.warning(f"¡ANOMALÍA DETECTADA! (Kill-Switch) IP: {x_vector} | Magnitud: {y_magnitude} | Límite: {upper_band:.2f}")
+            asyncio.create_task(self.broadcast_ws({
+                "type": "KILL_SWITCH",
+                "x_vector": x_vector,
+                "y_magnitude": y_magnitude,
+                "limit": upper_band,
+                "action": "BLOCKED"
+            }))
             return True 
             
         history.append(y_magnitude)
@@ -106,12 +130,26 @@ class QGuardSidecar:
             async def forward(src, dst, direction):
                 try:
                     while True:
-                        data = await src.read(8192)
+                        try:
+                            # Protección contra Slowloris: Idle Timeout de 5 segundos
+                            data = await asyncio.wait_for(src.read(8192), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            logging.warning(f"🛡️ Timeout por Inactividad (Slowloris detectado). Desconectando cliente.")
+                            break
+                            
                         if not data:
                             break
                             
                         if direction == "Client->Target":
                             x_vector, y_magnitude, z_entropy, t_time = await self.calculate_tesseract_metrics(data, addr)
+                            
+                            asyncio.create_task(self.broadcast_ws({
+                                "type": "TELEMETRY",
+                                "x_vector": x_vector,
+                                "y_magnitude": y_magnitude,
+                                "z_entropy": z_entropy,
+                                "t_time": t_time
+                            }))
                             
                             async with self.buffer_lock:
                                 self.swarm_buffer.append([float(addr[1]), float(y_magnitude), float(z_entropy), float(t_time)])
@@ -153,8 +191,12 @@ class QGuardSidecar:
     async def start(self):
         server = await asyncio.start_server(
             self.handle_client, self.listen_host, self.listen_port)
+        
+        ws_server = await websockets.serve(self.ws_handler, "127.0.0.1", 8081)
+        
         mode = "RUST (TZANiX Swarm)" if USE_RUST else "PYTHON PURO (Legacy)"
         logging.info(f"TZANiX Q-Guard (Sidecar) activado en modo: {mode}")
+        logging.info(f"📡 TZANiX Quantum Engine WebSocket transmitiendo en ws://127.0.0.1:8081")
         
         # Iniciar el recolector de latencia asíncrono
         asyncio.create_task(self._auto_flush_loop())
