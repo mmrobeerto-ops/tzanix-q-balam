@@ -8,9 +8,10 @@ import './index.css';
 
 function App() {
   const [logs, setLogs] = useState([]);
-  const [isAnomaly, setIsAnomaly] = useState(false);
+  // attackPhase: 0 = Seguro, 1 = Ataque Inyectado, 2 = Kill-Switch, 3 = Restauración
+  const [attackPhase, setAttackPhase] = useState(0); 
   const [stats, setStats] = useState({
-    activeConnections: 10000, // Simulando gran cantidad para look enterprise
+    activeConnections: 10000, 
     blockedIPs: new Set(),
     globalEntropy: 0.18
   });
@@ -19,7 +20,7 @@ function App() {
   const [demoRunning, setDemoRunning] = useState(false);
   const [wsUrl, setWsUrl] = useState('ws://localhost:8081');
 
-  const [entropyHistory, setEntropyHistory] = useState(Array(60).fill(0.18));
+  const [entropyHistory, setEntropyHistory] = useState(Array(60).fill(0.12));
 
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
@@ -28,6 +29,12 @@ function App() {
   const sceneRef = useRef(null);
   const pointsRef = useRef(null);
   const originalPositionsRef = useRef(null);
+  
+  // Referencias para coreografía dinámica
+  const vectorsGroupRef = useRef(null);
+  const quarantineGroupRef = useRef(null);
+  const shockwaveRef = useRef(null);
+  const bloomPassRef = useRef(null);
 
   const appendLog = (msg, type) => {
     const timestamp = new Date().toLocaleTimeString('es-ES', { hour12: false });
@@ -52,9 +59,9 @@ function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.event_type === 'TRAFFIC_FLOW') {
-            handleTrafficFlow(data.source_ip, data.coordinates, data.entropy_score);
+            handleTrafficFlow(data.source_ip, data.entropy_score);
           } else if (data.event_type === 'ATR_KILL_SWITCH') {
-            handleKillSwitch(data.source_ip, data.coordinates, data.entropy_score);
+            executeAttackChoreography(data.source_ip, data.entropy_score);
           }
         } catch (e) {
           console.error(e);
@@ -73,10 +80,10 @@ function App() {
   // --- LÓGICA DE SIMULACIÓN (MODO DEMO) ---
   useEffect(() => {
     if (mode === 'DEMO' && demoRunning) {
-      appendLog('INITIALIZING LOCAL SIMULATION...', 'INFO');
+      appendLog('[3:25:20] ESTADO: Red protegida. Entropía de Shannon: 0.18 (Baja).', 'INFO');
       demoIntervalRef.current = setInterval(() => {
-        const entropy = 0.15 + (Math.random() * 0.05); // Fluctuación normal
-        handleTrafficFlow("192.168.x.x", {x:0, y:0, z:0, t:0}, entropy * 8.0);
+        const entropy = 0.10 + (Math.random() * 0.05); // Fluctúa entre 10% y 15%
+        handleTrafficFlow("192.168.x.x", entropy * 8.0);
       }, 500);
     } else {
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
@@ -87,31 +94,48 @@ function App() {
     };
   }, [mode, demoRunning]);
 
-  // Manejadores centrales de estado
-  const handleTrafficFlow = (source_ip, coords, entropy_score) => {
+  const handleTrafficFlow = (source_ip, entropy_score) => {
+    if (attackPhase !== 0) return; // Ignorar tráfico normal durante el ataque
     const entropyPct = Math.min(entropy_score / 8.0, 1.0);
     setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
     setEntropyHistory(prev => [...prev.slice(1), entropyPct]);
-    if (Math.random() > 0.8) {
-      appendLog(`ENTROPY EVALUATION: NORMAL (${entropyPct.toFixed(2)})`, 'INFO');
-    }
   };
 
-  const handleKillSwitch = (source_ip, coords, entropy_score) => {
-    setIsAnomaly(true);
-    setTimeout(() => setIsAnomaly(false), 2500);
+  // --- COREOGRAFÍA DE 4 FASES (MÁQUINA DE ESTADOS) ---
+  const executeAttackChoreography = (ip, entropy) => {
+    if (attackPhase !== 0) return;
 
+    // FASE 2: Inyección de Ataque (T=0ms)
+    setAttackPhase(1);
     const entropyPct = 0.98;
-    appendLog(`[!] ATR TRIGGER: EXFILTRATION DETECTED`, 'CRITICAL');
-    appendLog(`[!] ANOMALY SCORE: ${entropy_score.toFixed(2)} SHANNON`, 'CRITICAL');
-    appendLog(`[+] VECTOR ISOLATED SUCCESSFULLY`, 'SUCCESS');
+    setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
+    setEntropyHistory(prev => [...prev.slice(1), entropyPct]);
+    appendLog(`ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
 
-    setStats(prev => {
-      const updated = new Set(prev.blockedIPs);
-      updated.add(source_ip);
-      return { ...prev, blockedIPs: updated, globalEntropy: entropyPct };
-    });
-    setEntropyHistory(prev => [...prev.slice(1), entropyPct]); 
+    // FASE 3: Activación Kill-Switch ATR (T=420ms)
+    setTimeout(() => {
+      setAttackPhase(2);
+      appendLog(`ACCIÓN: TZANiX Motor Inercial activó Kill-Switch ATR. IP ${ip} Aislada (0.42ms).`, 'SUCCESS');
+      setStats(prev => {
+        const updated = new Set(prev.blockedIPs);
+        updated.add(ip);
+        return { ...prev, blockedIPs: updated };
+      });
+      setEntropyHistory(prev => [...prev.slice(1), entropyPct]); 
+    }, 420);
+
+    // FASE 4: Restauración (T=2500ms)
+    setTimeout(() => {
+      setAttackPhase(3);
+      setStats(prev => ({ ...prev, globalEntropy: 0.12 }));
+      setEntropyHistory(prev => [...prev.slice(1), 0.12]);
+      appendLog(`ESTADO: Red protegida. Pérdida de datos: 0.00%. Latencia Proxy: 0.38ms.`, 'INFO');
+    }, 2500);
+
+    // Retorno a FASE 1: Estado Seguro (T=4000ms)
+    setTimeout(() => {
+      setAttackPhase(0);
+    }, 4000);
   };
 
 
@@ -132,30 +156,28 @@ function App() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x05070a, 1);
 
-    // Controles Orbitales
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.5;
 
-    // Post-Procesado (Bloom Effect)
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
     bloomPass.strength = 1.2;
     bloomPass.radius = 0.5;
     bloomPass.threshold = 0.1;
+    bloomPassRef.current = bloomPass;
 
     const composer = new EffectComposer(renderer);
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // Construcción de Matriz Cuántica Densa
+    // 1. Matriz Cuántica Densa (El Núcleo 4D)
     const particlesCount = 8000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particlesCount * 3);
     
-    // Distribución esférica reticular
     for(let i = 0; i < particlesCount; i++) {
         const r = 6 * Math.cbrt(Math.random());
         const theta = Math.random() * 2 * Math.PI;
@@ -171,7 +193,7 @@ function App() {
 
     const material = new THREE.PointsMaterial({
         size: 0.05,
-        color: 0x00e5ff,
+        color: 0x00f0ff,
         transparent: true,
         opacity: 0.8,
         blending: THREE.AdditiveBlending,
@@ -182,10 +204,17 @@ function App() {
     scene.add(particlesMesh);
     pointsRef.current = particlesMesh;
 
-    // Grid inferior oscuro
-    const gridHelper = new THREE.GridHelper(50, 50, 0x1A2333, 0x0a0e17);
-    gridHelper.position.y = -7;
-    scene.add(gridHelper);
+    // 2. Grupo de Vectores de Ataque (Inicialmente Vacío)
+    const vectorsGroup = new THREE.Group();
+    scene.add(vectorsGroup);
+    vectorsGroupRef.current = vectorsGroup;
+
+    // 3. Grupo de Cuarentena y Onda de Choque (Inicialmente Vacío)
+    const quarantineGroup = new THREE.Group();
+    scene.add(quarantineGroup);
+    quarantineGroupRef.current = quarantineGroup;
+
+    let localShockwave = null;
 
     let animationFrameId;
     let clock = new THREE.Clock();
@@ -193,39 +222,115 @@ function App() {
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
-      const anomalyState = isAnomaly;
+      
+      // Obtenemos el estado actual desde la referencia de React indirectamente
+      // dado que el bucle clousure captura la variable. Para asegurarnos, usamos setState dependency o un ref.
+      // Para evitar problemas de closure en requestAnimationFrame con React State:
+      // Usamos los hooks pero dependen de la renderización actual.
+      
+      // Evaluamos attackPhase directamente del scope
+      const phase = attackPhase;
 
       controls.update();
 
+      // --- LOGICA VISUAL DE FASES ---
       if (pointsRef.current) {
-        const positions = pointsRef.current.geometry.attributes.position.array;
+        const posAttr = pointsRef.current.geometry.attributes.position.array;
         const originals = originalPositionsRef.current;
         
-        // Cambio de color reactivo (Cian Neón -> Rojo Neón)
-        pointsRef.current.material.color.setHex(anomalyState ? 0xff2e63 : 0x00e5ff);
-        bloomPass.strength = anomalyState ? 2.5 : 1.2;
+        // Fase 1: Estado Seguro
+        if (phase === 0 || phase === 3) {
+            pointsRef.current.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
+            
+            // Limpiar grupos visuales si no hay ataque
+            if (phase === 0 && vectorsGroup.children.length > 0) {
+               vectorsGroup.clear();
+               quarantineGroup.clear();
+               localShockwave = null;
+            }
 
-        // Ruido matemático y funciones de onda
-        for(let i = 0; i < particlesCount; i++) {
-            const ix = i * 3;
-            let px = originals[ix];
-            let py = originals[ix+1];
-            let pz = originals[ix+2];
+            for(let i = 0; i < particlesCount; i++) {
+                const ix = i * 3;
+                let px = originals[ix];
+                let py = originals[ix+1];
+                let pz = originals[ix+2];
+                // Onda trigonométrica de reposo (Frecuencia armónica 5.00 Hz sim)
+                const wave = Math.sin(elapsedTime * 2.0 + px * 0.5) * 0.1;
+                
+                // Lerp suave hacia posición original
+                posAttr[ix] = THREE.MathUtils.lerp(posAttr[ix], px, 0.1);
+                posAttr[ix+1] = THREE.MathUtils.lerp(posAttr[ix+1], py + wave, 0.1);
+                posAttr[ix+2] = THREE.MathUtils.lerp(posAttr[ix+2], pz, 0.1);
+            }
+        } 
+        // Fase 2: Inyección de Ataque (Vectores Rojos, Deformación)
+        else if (phase === 1) {
+            pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
 
-            if (anomalyState) {
-                // Vibración caótica de exfiltración
-                const noise = Math.sin(elapsedTime * 15.0 + px) * 0.5;
-                positions[ix] = px + noise * Math.random();
-                positions[ix+1] = py + noise * Math.random();
-                positions[ix+2] = pz + noise * Math.random();
-            } else {
-                // Onda trigonométrica de reposo (Frecuencia armónica)
-                const wave = Math.sin(elapsedTime * 0.5 + px * 0.5) * 0.1;
-                positions[ix] = px;
-                positions[ix+1] = py + wave;
-                positions[ix+2] = pz;
+            // Crear vectores rojos disparándose si no existen
+            if (vectorsGroup.children.length === 0) {
+                for (let j = 0; j < 15; j++) {
+                    const lineGeo = new THREE.BufferGeometry();
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0xff2e63, transparent: true, opacity: 0.8 });
+                    // Desde afuera hacia un punto central aleatorio
+                    const start = new THREE.Vector3((Math.random()-0.5)*40, (Math.random()-0.5)*40, (Math.random()-0.5)*40);
+                    const end = new THREE.Vector3((Math.random()-0.5)*4, (Math.random()-0.5)*4, (Math.random()-0.5)*4);
+                    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...start.toArray(), ...end.toArray()]), 3));
+                    const vectorLine = new THREE.Line(lineGeo, lineMat);
+                    vectorsGroup.add(vectorLine);
+                }
+            }
+
+            // Animar el jaloneo rojo y temblor de la malla
+            for(let i = 0; i < particlesCount; i++) {
+                const ix = i * 3;
+                let px = originals[ix];
+                let py = originals[ix+1];
+                let pz = originals[ix+2];
+                // Ruido y deformación
+                const noise = Math.sin(elapsedTime * 20.0 + px) * 0.8;
+                posAttr[ix] = px + noise * Math.random();
+                posAttr[ix+1] = py + noise * Math.random();
+                posAttr[ix+2] = pz + noise * Math.random();
             }
         }
+        // Fase 3: Kill-Switch (Onda Blanca/Turquesa, Cuarentena)
+        else if (phase === 2) {
+            pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+
+            // Desaparecer vectores de ataque rotos
+            vectorsGroup.children.forEach(child => {
+                child.material.opacity -= 0.1;
+            });
+
+            // Generar onda y cuarentena
+            if (quarantineGroup.children.length === 0) {
+                // Onda expansiva blanca
+                const ringGeo = new THREE.TorusGeometry(1, 0.05, 16, 100);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
+                localShockwave = new THREE.Mesh(ringGeo, ringMat);
+                localShockwave.rotation.x = Math.PI / 2;
+                quarantineGroup.add(localShockwave);
+
+                // Cubos de cuarentena en zonas aleatorias de la malla
+                for(let k=0; k < 5; k++) {
+                    const cubeGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                    const cubeMat = new THREE.MeshBasicMaterial({ color: 0xff2e63, wireframe: true, transparent: true, opacity: 0.9 });
+                    const cube = new THREE.Mesh(cubeGeo, cubeMat);
+                    cube.position.set((Math.random()-0.5)*6, (Math.random()-0.5)*6, (Math.random()-0.5)*6);
+                    quarantineGroup.add(cube);
+                }
+            }
+
+            // Animar onda expansiva
+            if (localShockwave) {
+                localShockwave.scale.addScalar(0.5);
+                localShockwave.material.opacity -= 0.03;
+            }
+        }
+
         pointsRef.current.geometry.attributes.position.needsUpdate = true;
       }
 
@@ -246,18 +351,18 @@ function App() {
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      renderer.dispose();
     };
-  }, [isAnomaly]);
+  }, [attackPhase]); // Re-bind on phase change para asegurar que el closure tome la variable correcta
 
   // --- UI TRIGGERS ---
   const triggerSimulation = () => {
     if (mode === 'DEMO') {
-      appendLog('MANUAL OVERRIDE: INJECTING THREAT VECTOR...', 'WARN');
-      handleKillSwitch("10.0.0.99", {x:0, y:0, z:0, t:0}, 9.85);
+      const fakeIp = `192.168.1.${Math.floor(Math.random() * 255)}`;
+      executeAttackChoreography(fakeIp, 8.90);
     } else {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'START_SIMULATION' }));
-        appendLog('SENDING STRESS_TEST COMMAND TO PROXY...', 'INFO');
       } else {
         appendLog('ERROR: WEBSOCKET DISCONNECTED', 'CRITICAL');
       }
@@ -273,17 +378,25 @@ function App() {
       return `${x},${y}`;
     }).join(' ');
 
+    const isAlertColor = attackPhase === 1 || attackPhase === 2;
+
     return (
       <svg viewBox={`0 0 ${width} ${height}`} className="entropy-svg">
         <defs>
           <linearGradient id="gradientLine" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#00E5FF" />
-            <stop offset="100%" stopColor={isAnomaly ? "#FF2E63" : "#00E5FF"} />
+            <stop offset="0%" stopColor="#00F0FF" />
+            <stop offset="100%" stopColor={isAlertColor ? "#FF2E63" : "#00F0FF"} />
           </linearGradient>
         </defs>
         <polyline fill="none" stroke="url(#gradientLine)" strokeWidth="1.5" points={points} />
       </svg>
     );
+  };
+
+  const getStatusText = () => {
+    if (attackPhase === 0) return 'NÚCLEO PROTEGIDO (Q-SECURE)';
+    if (attackPhase === 1) return 'ANOMALÍA DETECTADA';
+    return 'EXFILTRACIÓN BLOQUEADA';
   };
 
   return (
@@ -299,11 +412,11 @@ function App() {
           </div>
           
           <div className="top-metrics">
-             <div className={`status-indicator ${isAnomaly ? 'alert' : ''}`}>
-                [STATUS: {isAnomaly ? 'THREAT BLOCKED' : 'SECURE'}]
+             <div className={`status-indicator ${attackPhase > 0 ? 'alert' : ''}`}>
+                ESTADO: {getStatusText()}
              </div>
              <div className="separator">|</div>
-             <div className="latency-indicator">LATENCY: {(0.28 + Math.random()*0.1).toFixed(2)}ms</div>
+             <div className="latency-indicator">LATENCY: {attackPhase === 0 ? '0.38' : '0.42'}ms</div>
           </div>
 
           <div className="controls">
@@ -325,15 +438,15 @@ function App() {
             </div>
             <ul className="metrics-list">
               <li>
-                <span className="label">- Frequency:</span>
-                <span className="val">{isAnomaly ? '98.50' : (5.00 + Math.random()).toFixed(2)} Hz</span>
+                <span className="label">- Frecuencia:</span>
+                <span className="val">{attackPhase > 0 ? '98.50' : (5.00 + Math.random()*0.1).toFixed(2)} Hz</span>
               </li>
               <li>
-                <span className="label">- Entropy:</span>
+                <span className="label">- Entropía:</span>
                 <span className="val">{stats.globalEntropy.toFixed(2)}</span>
               </li>
               <li>
-                <span className="label">- Connections:</span>
+                <span className="label">- Conexiones:</span>
                 <span className="val">{stats.activeConnections.toLocaleString()}</span>
               </li>
             </ul>
@@ -351,11 +464,11 @@ function App() {
              )}
              {mode === 'DEMO' && (
                 <button className="action-btn" onClick={() => setDemoRunning(!demoRunning)}>
-                  {demoRunning ? '[PAUSE DEMO]' : '[START DEMO]'}
+                  {demoRunning ? '[PAUSAR DEMO]' : '[INICIAR DEMO]'}
                 </button>
              )}
              <button className="action-btn alert-btn" onClick={triggerSimulation}>
-               [SIMULATE ATTACK]
+               [SIMULAR ATAQUE]
              </button>
           </div>
           
@@ -366,7 +479,7 @@ function App() {
           <div className="terminal">
             {logs.map(log => (
               <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
-                <span className="time">{'>'} [{log.time}]</span>
+                <span className="time">{'>'} {log.msg.includes('[') ? '' : `[${log.time}] `}</span>
                 <span className="msg">{log.msg}</span>
               </div>
             ))}
