@@ -231,7 +231,7 @@ function App() {
         linksPos[i*6+3] = d2.x; linksPos[i*6+4] = d2.y; linksPos[i*6+5] = d2.z;
     }
     linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPos, 3));
-    const linksMat = new THREE.LineBasicMaterial({ color: 0x00ffa3, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending });
+    const linksMat = new THREE.LineBasicMaterial({ color: 0x10ff88, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false });
     const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMat);
     scene.add(dataLinksMesh);
 
@@ -254,7 +254,7 @@ function App() {
 
     // 5. Pulso de Entropía (Heartbeat)
     const pulseGeo = new THREE.TorusGeometry(1, 0.02, 16, 100);
-    const pulseMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+    const pulseMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
     const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
     pulseMesh.rotation.x = Math.PI / 2;
     scene.add(pulseMesh);
@@ -300,7 +300,8 @@ function App() {
                lastPulseTime = elapsedTime;
            }
            pulseMesh.scale.addScalar(0.08);
-           pulseMesh.material.opacity -= 0.02;
+           // Cliping a 0 para evitar opacidad negativa (que renderiza negro)
+           pulseMesh.material.opacity = Math.max(0, pulseMesh.material.opacity - 0.02);
         } else {
            pulseMesh.material.opacity = 0; // Ocultar durante ataque
         }
@@ -310,7 +311,7 @@ function App() {
             linksMat.color.setHex(0xff2e63);
             linksMat.opacity = Math.random() * 0.8;
         } else {
-            linksMat.color.setHex(0x00ffa3);
+            linksMat.color.setHex(0x10ff88); // Jade Brillante
             linksMat.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.3; // Parpadeo estilo fibra óptica
         }
 
