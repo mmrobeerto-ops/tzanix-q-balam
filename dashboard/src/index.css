@@ -9,11 +9,11 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #05050f;
+  background-color: #070A0F;
   color: #fff;
 }
 
-/* 3D Canvas al fondo absoluto */
+/* 3D Canvas al fondo */
 .three-canvas {
   position: fixed;
   top: 0;
@@ -23,7 +23,7 @@ body {
   z-index: 1;
 }
 
-/* HUD Overlay: Capa táctica por encima del 3D */
+/* Capa táctica por encima */
 .hud-overlay {
   position: fixed;
   top: 0;
@@ -31,125 +31,135 @@ body {
   width: 100vw;
   height: 100vh;
   z-index: 10;
-  pointer-events: none; /* Deja pasar clicks al 3D si hubiera interactividad */
+  pointer-events: none;
   display: flex;
   flex-direction: column;
-  padding: 2rem;
+  padding: 1.5rem;
   box-sizing: border-box;
 }
 
-/* Paneles Glassmorphism Tácticos */
+/* Paneles Glassmorphism Enterprise */
 .glass-panel {
-  background: rgba(5, 10, 20, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 242, 254, 0.2);
-  border-radius: 12px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  background: #161B22;
+  border: 1px solid #1F2937;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  pointer-events: auto; /* Para permitir clicks en paneles */
 }
 
-/* Header Superior */
+/* Header */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 1rem 1.5rem;
   width: 100%;
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 1.8rem;
-  background: linear-gradient(90deg, #00f2fe, #4facfe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 1.6rem;
+  color: #00FF9D;
   text-transform: uppercase;
   letter-spacing: 2px;
 }
 
 .brand .subtitle {
   margin: 0;
-  font-size: 0.8rem;
-  color: #00f2fe;
+  font-size: 0.75rem;
+  color: #8B949E;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-.actions {
+/* Controles del Header */
+.controls {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.simulate-btn {
-  background: rgba(255, 0, 51, 0.2);
-  color: #ff0033;
-  border: 1px solid #ff0033;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+.mode-select, .ws-input {
+  background: #0D1117;
+  color: #00FF9D;
+  border: 1px solid #1F2937;
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: bold;
+  outline: none;
+}
+
+.ws-input {
+  width: 200px;
+}
+
+.demo-btn {
+  background: rgba(0, 255, 157, 0.1);
+  color: #00FF9D;
+  border: 1px solid #00FF9D;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
   font-weight: bold;
   cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
+}
+
+.demo-btn:hover {
+  background: rgba(0, 255, 157, 0.2);
+}
+
+.simulate-btn {
+  background: rgba(255, 0, 85, 0.15);
+  color: #FF0055;
+  border: 1px solid #FF0055;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .simulate-btn:hover {
-  background: rgba(255, 0, 51, 0.4);
-  box-shadow: 0 0 15px rgba(255, 0, 51, 0.6);
+  background: rgba(255, 0, 85, 0.3);
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.4);
 }
 
-.status-badge {
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  font-weight: bold;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.status-badge.alert {
-  background: rgba(255, 0, 51, 0.2);
-  color: #ff0033;
-  border-color: #ff0033;
-  box-shadow: 0 0 20px rgba(255, 0, 51, 0.5);
-}
-
-/* Paneles Flotantes Inferiores */
+/* Paneles Flotantes (Izquierda y Derecha) */
 .panel {
   position: absolute;
-  bottom: 2rem;
+  top: 100px;
   padding: 1.5rem;
-  width: 400px;
+  width: 320px;
 }
 
-.bottom-left {
-  left: 2rem;
+.left-panel {
+  left: 1.5rem;
 }
 
-.bottom-right {
-  right: 2rem;
+.right-panel {
+  right: 1.5rem;
+  width: 450px;
 }
 
 .panel h3 {
   margin-top: 0;
   margin-bottom: 1rem;
-  font-size: 0.9rem;
-  color: #00f2fe;
+  font-size: 0.85rem;
+  color: #8B949E;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-bottom: 1px solid rgba(0, 242, 254, 0.3);
+  border-bottom: 1px solid #1F2937;
   padding-bottom: 0.5rem;
 }
 
-/* Gráfico de Entropía */
+/* Gráfico SVG */
 .entropy-graph-container {
   width: 100%;
-  height: 100px;
-  background: rgba(0, 242, 254, 0.05);
-  border: 1px dashed rgba(0, 242, 254, 0.2);
+  height: 80px;
+  background: #0D1117;
+  border: 1px solid #1F2937;
   border-radius: 4px;
   margin-bottom: 1rem;
 }
@@ -159,7 +169,7 @@ body {
   height: 100%;
 }
 
-/* Métricas en Grid */
+/* Métricas Grid */
 .stat-grid {
   display: flex;
   justify-content: space-between;
@@ -172,51 +182,71 @@ body {
 
 .stat-grid .label {
   font-size: 0.7rem;
-  color: #8899aa;
+  color: #8B949E;
   margin-bottom: 0.2rem;
 }
 
 .stat-grid .val {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: bold;
 }
 
-.cyan { color: #00f2fe; }
-.red { color: #ff0033; }
-.green { color: #10b981; }
+.cyan { color: #00E5FF; }
+.red { color: #FF0055; }
+.green { color: #00FF9D; }
 
-/* Consola de Eventos (Terminal) */
-.console-panel {
-  width: 500px;
+/* HUD Central Inferior */
+.center-hud {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.8rem 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #8B949E;
 }
 
+.status-indicator {
+  color: #00FF9D;
+  font-weight: bold;
+}
+
+.separator {
+  color: #1F2937;
+}
+
+/* Terminal (Consola de Eventos) */
 .terminal {
-  height: 180px;
+  height: 250px;
   overflow-y: auto;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  background: #0D1117;
+  padding: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #1F2937;
 }
 
-/* Ocultar scrollbar para estética más limpia */
 .terminal::-webkit-scrollbar { width: 4px; }
-.terminal::-webkit-scrollbar-thumb { background: rgba(0, 242, 254, 0.5); }
+.terminal::-webkit-scrollbar-thumb { background: #1F2937; }
 
 .log-entry {
   display: flex;
   gap: 0.5rem;
 }
 
-.log-entry .time {
-  color: #8899aa;
-}
-
-.log-entry.info .msg { color: #00f2fe; }
+.log-entry .time { color: #8B949E; }
+.log-entry.info .msg { color: #00FF9D; }
 .log-entry.warn .msg { color: #ffaa00; }
-.log-entry.critical .msg { color: #ff0033; font-weight: bold; }
-.log-entry.success .msg { color: #10b981; }
+.log-entry.critical .msg { color: #FF0055; font-weight: bold; }
+.log-entry.success .msg { color: #00E5FF; }
 
 /* Efecto Flash Rojo General */
 .screen-flash-alert {
@@ -224,6 +254,6 @@ body {
 }
 
 @keyframes bgFlash {
-  0% { box-shadow: inset 0 0 150px rgba(255, 0, 51, 0.6); }
-  100% { box-shadow: inset 0 0 0 rgba(255, 0, 51, 0); }
+  0% { box-shadow: inset 0 0 150px rgba(255, 0, 85, 0.4); }
+  100% { box-shadow: inset 0 0 0 rgba(255, 0, 85, 0); }
 }

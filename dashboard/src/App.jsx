@@ -8,68 +8,55 @@ function App() {
   const [stats, setStats] = useState({
     activeConnections: 0,
     blockedIPs: new Set(),
-    globalEntropy: 0.85
+    globalEntropy: 0.15
   });
+
+  // Modos de operación
+  const [mode, setMode] = useState('DEMO'); // 'DEMO' | 'PROD'
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [wsUrl, setWsUrl] = useState('ws://127.0.0.1:8081');
 
   // Historial de entropía para la gráfica (60 puntos)
   const [entropyHistory, setEntropyHistory] = useState(Array(60).fill(0));
 
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
+  const demoIntervalRef = useRef(null);
 
   // Referencias mutables para el renderizador 3D
   const sceneRef = useRef(null);
-  const nodesMapRef = useRef(new Map()); // IP -> Group { mesh, line, particles, isAttacking }
-  const coreRef = useRef(null);
-  const coreOriginalVertices = useRef([]); // Para restaurar la forma
+  const nodesMapRef = useRef(new Map());
+  const tesseractRef = useRef(null);
+  const outerCubeRef = useRef(null);
+  const innerCubeRef = useRef(null);
+  const tesseractLinksRef = useRef(null);
 
-  // Añadir un log a la consola táctica
   const appendLog = (msg, type) => {
     const timestamp = new Date().toLocaleTimeString('es-ES', { hour12: false });
     const newLog = { id: Math.random(), time: timestamp, msg, type };
     setLogs(prev => [newLog, ...prev].slice(0, 8));
   };
 
-  // 1. Conexión WebSocket
+  // --- LÓGICA DE WEBSOCKETS (MODO PROD) ---
   useEffect(() => {
+    if (mode !== 'PROD') {
+      if (wsRef.current) wsRef.current.close();
+      return;
+    }
+
     const connectWS = () => {
-      const ws = new WebSocket('ws://127.0.0.1:8081');
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      ws.onopen = () => {
-        appendLog('TZANiX ENGINE ACTIVADO. Holograma en línea.', 'INFO');
-      };
+      ws.onopen = () => appendLog(`CONECTADO A LA RED: ${wsUrl}`, 'INFO');
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-
           if (data.event_type === 'TRAFFIC_FLOW') {
-            const ip = `${data.source_ip}:${Math.floor(data.coordinates.x)}`;
-            const entropyPct = data.entropy_score / 8.0;
-
-            setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
-            setEntropyHistory(prev => [...prev.slice(1), entropyPct]);
-            trigger3DNodeTelemetry(ip, data.coordinates.y, entropyPct, false);
-
+            handleTrafficFlow(data.source_ip, data.coordinates, data.entropy_score);
           } else if (data.event_type === 'ATR_KILL_SWITCH') {
-            const ip = `${data.source_ip}:${Math.floor(data.coordinates.x)}`;
-            setIsAnomaly(true);
-            setTimeout(() => setIsAnomaly(false), 2000);
-
-            appendLog(`ALERTA: Pico de Entropía detectado (${data.entropy_score.toFixed(2)} Shannon)`, 'WARN');
-            appendLog(`VECTOR: Intento de exfiltración en IP ${ip}`, 'WARN');
-            appendLog(`ACCIÓN: TZANiX Engine activó Kill-Switch ATR`, 'CRITICAL');
-            appendLog(`ESTADO: Amenaza neutralizada en ${data.coordinates.t} ms (Datos intactos)`, 'SUCCESS');
-
-            setStats(prev => {
-              const updatedBlocked = new Set(prev.blockedIPs);
-              updatedBlocked.add(ip);
-              return { ...prev, blockedIPs: updatedBlocked, globalEntropy: 0.0 };
-            });
-            setEntropyHistory(prev => [...prev.slice(1), 1.0]); // Pico rojo máximo
-
-            trigger3DNodeBlock(ip);
+            handleKillSwitch(data.source_ip, data.coordinates, data.entropy_score);
           }
         } catch (e) {
           console.error(e);
@@ -77,8 +64,7 @@ function App() {
       };
 
       ws.onclose = () => {
-        appendLog('CONEXIÓN PERDIDA. Reconectando...', 'WARN');
-        setTimeout(connectWS, 2000);
+        appendLog('CONEXIÓN WS CERRADA.', 'WARN');
       };
     };
 
@@ -86,15 +72,66 @@ function App() {
     return () => {
       if (wsRef.current) wsRef.current.close();
     };
-  }, []);
+  }, [mode, wsUrl]);
 
-  // 2. Inicialización de la Escena 3D
+  // --- LÓGICA DE SIMULACIÓN (MODO DEMO) ---
+  useEffect(() => {
+    if (mode === 'DEMO' && demoRunning) {
+      demoIntervalRef.current = setInterval(() => {
+        const ip = `192.168.1.${Math.floor(Math.random() * 255)}`;
+        const x = (Math.random() - 0.5) * 10;
+        const y = (Math.random() - 0.5) * 10;
+        const z = (Math.random() - 0.5) * 10;
+        const t = Math.random() * 1000;
+        const entropy = Math.random() * 1.5; // Entropía baja normal
+        handleTrafficFlow(ip, {x, y, z, t}, entropy);
+      }, 100);
+    } else {
+      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
+    }
+
+    return () => {
+      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
+    };
+  }, [mode, demoRunning]);
+
+  // Manejadores centrales de estado (usados por PROD y DEMO)
+  const handleTrafficFlow = (source_ip, coords, entropy_score) => {
+    const ip = `${source_ip}:${Math.floor(coords.x)}`;
+    const entropyPct = Math.min(entropy_score / 8.0, 1.0);
+    
+    setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
+    setEntropyHistory(prev => [...prev.slice(1), entropyPct]);
+    trigger3DNodeTelemetry(ip, coords.y, entropyPct, false);
+  };
+
+  const handleKillSwitch = (source_ip, coords, entropy_score) => {
+    const ip = `${source_ip}:${Math.floor(coords.x)}`;
+    setIsAnomaly(true);
+    setTimeout(() => setIsAnomaly(false), 2000);
+
+    appendLog(`ALERTA: Pico de Entropía (ATR) ${entropy_score.toFixed(2)} Shannon`, 'WARN');
+    appendLog(`VECTOR: Intento exfiltración desde ${ip}`, 'WARN');
+    appendLog(`ACCIÓN: TZANiX Motor Inercial activó escudo ATR`, 'CRITICAL');
+    appendLog(`ESTADO: Red protegida. Pérdida 0.00%`, 'SUCCESS');
+
+    setStats(prev => {
+      const updated = new Set(prev.blockedIPs);
+      updated.add(ip);
+      return { ...prev, blockedIPs: updated, globalEntropy: 0.0 };
+    });
+    setEntropyHistory(prev => [...prev.slice(1), 1.0]); 
+    trigger3DNodeBlock(ip);
+  };
+
+
+  // --- INICIALIZACIÓN 3D ---
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.fog = new THREE.FogExp2(0x05050f, 0.06);
+    scene.fog = new THREE.FogExp2(0x070a0f, 0.06);
 
     const camera = new THREE.PerspectiveCamera(60, canvasRef.current.clientWidth / canvasRef.current.clientHeight, 0.1, 100);
     camera.position.set(0, 3, 10);
@@ -104,143 +141,153 @@ function App() {
     renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
 
-    const ambientLight = new THREE.AmbientLight(0x112244);
+    const ambientLight = new THREE.AmbientLight(0x161b22, 2.0);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0x00f2fe, 2.0);
-    dirLight.position.set(5, 10, 5);
-    scene.add(dirLight);
-
-    const redLight = new THREE.PointLight(0xff0033, 0, 20); // Empieza apagada
+    const redLight = new THREE.PointLight(0xff0055, 0, 20); 
     redLight.position.set(0, 0, 0);
     scene.add(redLight);
 
-    // NÚCLEO COMPLEJO (Esfera Geodésica / Wireframe)
-    const coreGeometry = new THREE.IcosahedronGeometry(1.8, 3);
-    
-    // Guardar vértices originales para la animación de respiración y deformación
-    const posAttribute = coreGeometry.attributes.position;
-    const vertexCount = posAttribute.count;
-    coreOriginalVertices.current = new Float32Array(posAttribute.array);
+    // CONSTRUCCIÓN DEL TESSERACT 4D
+    const tesseractGroup = new THREE.Group();
+    scene.add(tesseractGroup);
+    tesseractRef.current = tesseractGroup;
 
-    const coreMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00f2fe,
-      wireframe: true,
-      emissive: 0x004488,
-      emissiveIntensity: 0.8,
-      transparent: true,
-      opacity: 0.9
-    });
-    
-    const core = new THREE.Mesh(coreGeometry, coreMaterial);
-    scene.add(core);
-    coreRef.current = core;
+    // Cubo Exterior
+    const outerSize = 2.4;
+    const outerGeom = new THREE.BoxGeometry(outerSize, outerSize, outerSize);
+    const outerEdgesGeom = new THREE.EdgesGeometry(outerGeom);
+    const outerMat = new THREE.LineBasicMaterial({ color: 0x00ff9d, transparent: true, opacity: 0.8 });
+    const outerCube = new THREE.LineSegments(outerEdgesGeom, outerMat);
+    tesseractGroup.add(outerCube);
+    outerCubeRef.current = outerCube;
 
-    // Núcleo interno brillante
-    const innerCoreGeo = new THREE.IcosahedronGeometry(1.5, 2);
-    const innerCoreMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.15 });
-    const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
-    core.add(innerCore);
+    // Cubo Interior
+    const innerSize = 1.0;
+    const innerGeom = new THREE.BoxGeometry(innerSize, innerSize, innerSize);
+    const innerEdgesGeom = new THREE.EdgesGeometry(innerGeom);
+    const innerMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 1.0 });
+    const innerCube = new THREE.LineSegments(innerEdgesGeom, innerMat);
+    tesseractGroup.add(innerCube);
+    innerCubeRef.current = innerCube;
 
-    // Fondo Cuántico
+    // Vértices de conexión 4D
+    const linkGeom = new THREE.BufferGeometry();
+    const linkPositions = new Float32Array(8 * 2 * 3); // 8 lineas, 2 puntos, 3 ejes
+    linkGeom.setAttribute('position', new THREE.BufferAttribute(linkPositions, 3));
+    const linkMat = new THREE.LineBasicMaterial({ color: 0x00ff9d, transparent: true, opacity: 0.3 });
+    const tesseractLinks = new THREE.LineSegments(linkGeom, linkMat);
+    tesseractGroup.add(tesseractLinks);
+    tesseractLinksRef.current = tesseractLinks;
+
+    // Fondo Malla (Grid)
+    const gridHelper = new THREE.GridHelper(40, 40, 0x1f2937, 0x0d1117);
+    gridHelper.position.y = -4;
+    scene.add(gridHelper);
+
+    // Fondo de Nodos Cuánticos
     const starsGeometry = new THREE.BufferGeometry();
-    const starsCount = 800;
+    const starsCount = 400;
     const starPositions = new Float32Array(starsCount * 3);
     for (let i = 0; i < starsCount * 3; i++) {
       starPositions[i] = (Math.random() - 0.5) * 40;
     }
     starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0x4facfe, size: 0.05, transparent: true, opacity: 0.4 });
+    const starsMaterial = new THREE.PointsMaterial({ color: 0x8b949e, size: 0.05, transparent: true, opacity: 0.3 });
     const starField = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(starField);
 
     let animationFrameId;
     let clock = new THREE.Clock();
 
+    const getCubeVertices = (size) => {
+      const s = size / 2;
+      return [
+        [-s, -s, -s], [s, -s, -s], [s, -s, s], [-s, -s, s],
+        [-s, s, -s], [s, s, -s], [s, s, s], [-s, s, s]
+      ];
+    };
+
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
+      const anomalyState = isAnomaly;
 
-      // Animación del Núcleo Central (Respiración + Deformación)
-      if (coreRef.current) {
-        coreRef.current.rotation.y = elapsedTime * 0.15;
-        coreRef.current.rotation.x = elapsedTime * 0.05;
-        innerCore.rotation.y = -elapsedTime * 0.1;
+      // Animación del Tesseract
+      if (tesseractGroup) {
+        tesseractGroup.rotation.y = elapsedTime * 0.1;
+        tesseractGroup.rotation.x = elapsedTime * 0.05;
 
-        const positions = coreRef.current.geometry.attributes.position.array;
-        const originals = coreOriginalVertices.current;
-        const anomalyState = isAnomaly; // Usar variable del estado actual
+        // Rotación relativa del cubo interior para efecto 4D
+        innerCube.rotation.x = elapsedTime * -0.2;
+        innerCube.rotation.y = elapsedTime * 0.15;
+        innerCube.rotation.z = elapsedTime * 0.05;
 
-        redLight.intensity = anomalyState ? 3.0 : 0;
-        coreRef.current.material.color.setHex(anomalyState ? 0xff0033 : 0x00f2fe);
-        coreRef.current.material.emissive.setHex(anomalyState ? 0x660000 : 0x004488);
-        innerCore.material.color.setHex(anomalyState ? 0xff0000 : 0x00f2fe);
+        redLight.intensity = anomalyState ? 5.0 : 0;
+        outerCube.material.color.setHex(anomalyState ? 0xff0055 : 0x00ff9d);
+        innerCube.material.color.setHex(anomalyState ? 0xff0000 : 0x00e5ff);
+        tesseractLinks.material.color.setHex(anomalyState ? 0xff0055 : 0x00ff9d);
 
-        for (let i = 0; i < vertexCount; i++) {
-          const idx = i * 3;
-          let nx = originals[idx];
-          let ny = originals[idx + 1];
-          let nz = originals[idx + 2];
+        // Actualizar vértices de conexión dinámicamente
+        const outerVerts = getCubeVertices(outerSize);
+        const innerVerts = getCubeVertices(innerSize);
+        
+        // Aplicar la rotación del innerCube a sus vértices locales para calcular la línea
+        const euler = new THREE.Euler(innerCube.rotation.x, innerCube.rotation.y, innerCube.rotation.z);
+        const q = new THREE.Quaternion().setFromEuler(euler);
 
-          // Respiración base
-          const breathe = 1 + Math.sin(elapsedTime * 2 + ny) * 0.03;
+        let linkIdx = 0;
+        const positions = tesseractLinks.geometry.attributes.position.array;
+
+        for (let i = 0; i < 8; i++) {
+          let ox = outerVerts[i][0], oy = outerVerts[i][1], oz = outerVerts[i][2];
           
+          let vec = new THREE.Vector3(innerVerts[i][0], innerVerts[i][1], innerVerts[i][2]);
+          vec.applyQuaternion(q);
+          let ix = vec.x, iy = vec.y, iz = vec.z;
+
+          // Deformación si hay anomalía
           if (anomalyState) {
-            // Deformación caótica si hay anomalía
-            nx += (Math.random() - 0.5) * 0.4;
-            ny += (Math.random() - 0.5) * 0.4;
-            nz += (Math.random() - 0.5) * 0.4;
+            const jitter = 0.3;
+            ox += (Math.random() - 0.5) * jitter; oy += (Math.random() - 0.5) * jitter; oz += (Math.random() - 0.5) * jitter;
+            ix += (Math.random() - 0.5) * jitter; iy += (Math.random() - 0.5) * jitter; iz += (Math.random() - 0.5) * jitter;
           }
 
-          positions[idx] = nx * breathe;
-          positions[idx + 1] = ny * breathe;
-          positions[idx + 2] = nz * breathe;
+          positions[linkIdx++] = ox; positions[linkIdx++] = oy; positions[linkIdx++] = oz;
+          positions[linkIdx++] = ix; positions[linkIdx++] = iy; positions[linkIdx++] = iz;
         }
-        coreRef.current.geometry.attributes.position.needsUpdate = true;
+        tesseractLinks.geometry.attributes.position.needsUpdate = true;
       }
 
-      starField.rotation.y = elapsedTime * 0.02;
-
-      // Animar Nodos y Conexiones
+      // Animar Nodos
       const nodesMap = nodesMapRef.current;
       setStats(prev => ({ ...prev, activeConnections: nodesMap.size }));
 
       nodesMap.forEach((nodeGroup, ip) => {
-        // Rotación orbital
         const angle = elapsedTime * nodeGroup.orbitSpeed + nodeGroup.initialAngle;
         nodeGroup.mesh.position.x = Math.cos(angle) * nodeGroup.orbitRadius;
         nodeGroup.mesh.position.z = Math.sin(angle) * nodeGroup.orbitRadius;
         nodeGroup.mesh.position.y = Math.sin(angle * 1.5) * 1.5;
 
-        // Actualizar línea
-        const positions = new Float32Array([
-          0, 0, 0,
-          nodeGroup.mesh.position.x, nodeGroup.mesh.position.y, nodeGroup.mesh.position.z
-        ]);
+        const positions = new Float32Array([0, 0, 0, nodeGroup.mesh.position.x, nodeGroup.mesh.position.y, nodeGroup.mesh.position.z]);
         nodeGroup.line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        // Cuarentena Cube (si está bloqueado)
         if (nodeGroup.quarantine) {
           nodeGroup.quarantine.position.copy(nodeGroup.mesh.position);
           nodeGroup.quarantine.rotation.x += 0.05;
           nodeGroup.quarantine.rotation.y += 0.05;
         }
 
-        // Animar Flujo de Datos
         if (nodeGroup.particles && nodeGroup.line.material.opacity > 0) {
           const particlePositions = nodeGroup.particles.geometry.attributes.position.array;
           for (let i = 0; i < nodeGroup.particlesCount; i++) {
-            
-            // Si es ataque, el flujo se INVIERTE (Exfiltración hacia afuera)
             if (nodeGroup.isAttacking) {
               nodeGroup.particlesProgress[i] += 0.04;
               if (nodeGroup.particlesProgress[i] >= 1.0) nodeGroup.particlesProgress[i] = 0.0;
             } else {
-              // Flujo normal hacia adentro
               nodeGroup.particlesProgress[i] -= 0.02;
               if (nodeGroup.particlesProgress[i] <= 0) nodeGroup.particlesProgress[i] = 1.0;
             }
-
             const progress = nodeGroup.particlesProgress[i];
             particlePositions[i * 3 + 0] = nodeGroup.mesh.position.x * progress;
             particlePositions[i * 3 + 1] = nodeGroup.mesh.position.y * progress;
@@ -249,7 +296,6 @@ function App() {
           nodeGroup.particles.geometry.attributes.position.needsUpdate = true;
         }
 
-        // Auto-eliminar inactivos
         if (Date.now() - nodeGroup.lastActive > 3000 && !nodeGroup.blocked) {
           scene.remove(nodeGroup.mesh, nodeGroup.line, nodeGroup.particles);
           nodesMap.delete(ip);
@@ -282,42 +328,34 @@ function App() {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
     };
-  }, [isAnomaly]); // Re-bind animation when anomaly state changes
+  }, [isAnomaly]);
 
-  // 3. Crear o Actualizar Nodos (Telemetría Normal o Ataque Pre-Bloqueo)
   const trigger3DNodeTelemetry = (ip, magnitude, entropyPct, isAttack) => {
     const scene = sceneRef.current;
     if (!scene) return;
 
     let nodeGroup = nodesMapRef.current.get(ip);
-
     if (!nodeGroup) {
-      const orbitRadius = 4.0 + Math.random() * 3.0;
-      const initialAngle = Math.random() * Math.PI * 2;
-      const orbitSpeed = 0.2 + Math.random() * 0.3;
-
       const geom = new THREE.OctahedronGeometry(0.2);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x004422 });
+      const mat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
       const mesh = new THREE.Mesh(geom, mat);
       scene.add(mesh);
 
       const lineGeom = new THREE.BufferGeometry();
-      const lineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 });
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.2 });
       const line = new THREE.Line(lineGeom, lineMat);
       scene.add(line);
 
-      const particlesCount = 6;
       const particleGeom = new THREE.BufferGeometry();
-      const particlePositions = new Float32Array(particlesCount * 3);
-      const particlesProgress = Array(particlesCount).fill(0).map((_, i) => i / particlesCount);
-      particleGeom.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-      const particleMat = new THREE.PointsMaterial({ color: 0x00ffaa, size: 0.15, transparent: true, opacity: 0.8 });
+      const particlesCount = 6;
+      particleGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particlesCount * 3), 3));
+      const particleMat = new THREE.PointsMaterial({ color: 0x00ff9d, size: 0.15, transparent: true, opacity: 0.8 });
       const particles = new THREE.Points(particleGeom, particleMat);
       scene.add(particles);
 
       nodeGroup = {
-        mesh, line, particles, particlesCount, particlesProgress,
-        orbitRadius, orbitSpeed, initialAngle,
+        mesh, line, particles, particlesCount, particlesProgress: Array(particlesCount).fill(0).map((_, i) => i / particlesCount),
+        orbitRadius: 4.0 + Math.random() * 3.0, orbitSpeed: 0.2 + Math.random() * 0.3, initialAngle: Math.random() * Math.PI * 2,
         blocked: false, isAttacking: false, quarantine: null, lastActive: Date.now()
       };
       nodesMapRef.current.set(ip, nodeGroup);
@@ -327,26 +365,21 @@ function App() {
     nodeGroup.isAttacking = isAttack || magnitude > 20000;
 
     if (nodeGroup.isAttacking && !nodeGroup.blocked) {
-      // Intento de exfiltración (Rojo, deformación)
-      nodeGroup.mesh.material.color.setHex(0xff0033);
-      nodeGroup.mesh.material.emissive.setHex(0x660000);
-      nodeGroup.line.material.color.setHex(0xff0033);
+      nodeGroup.mesh.material.color.setHex(0xff0055);
+      nodeGroup.line.material.color.setHex(0xff0055);
       nodeGroup.line.material.opacity = 0.8;
-      nodeGroup.particles.material.color.setHex(0xff0033);
+      nodeGroup.particles.material.color.setHex(0xff0055);
     } else if (!nodeGroup.blocked) {
-      // Normal
-      nodeGroup.mesh.material.color.setHex(0x00ffcc);
-      nodeGroup.line.material.color.setHex(0x00ffff);
-      nodeGroup.line.material.opacity = 0.3;
-      nodeGroup.particles.material.color.setHex(0x00ffaa);
+      nodeGroup.mesh.material.color.setHex(0x00e5ff);
+      nodeGroup.line.material.color.setHex(0x00e5ff);
+      nodeGroup.line.material.opacity = 0.2;
+      nodeGroup.particles.material.color.setHex(0x00ff9d);
     }
   };
 
-  // 4. TZANiX Action: Bloqueo, Escudo Dorado, Cuarentena
   const trigger3DNodeBlock = (ip) => {
     const scene = sceneRef.current;
     if (!scene) return;
-
     const nodeGroup = nodesMapRef.current.get(ip);
     if (!nodeGroup) return;
 
@@ -354,30 +387,21 @@ function App() {
     nodeGroup.isAttacking = false;
     nodeGroup.lastActive = Date.now() + 100000; 
 
-    // Onda de Choque Dorada (El escudo repelente)
-    const waveGeom = new THREE.TorusGeometry(1.8, 0.1, 16, 100);
-    const waveMat = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 1.0 });
-    const shockwave = new THREE.Mesh(waveGeom, waveMat);
+    const waveMat = new THREE.MeshBasicMaterial({ color: 0x00ff9d, transparent: true, opacity: 1.0 });
+    const shockwave = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.05, 16, 100), waveMat);
     shockwave.rotation.x = Math.PI / 2;
     shockwave.name = "shockwave";
     scene.add(shockwave);
 
-    // Malla de Cuarentena (Cubo dorado/blanco encerrando al atacante)
-    const cubeGeom = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-    const cubeMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true, transparent: true, opacity: 0.8 });
-    const quarantine = new THREE.Mesh(cubeGeom, cubeMat);
+    const cubeMat = new THREE.MeshBasicMaterial({ color: 0x00ff9d, wireframe: true, transparent: true, opacity: 0.8 });
+    const quarantine = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), cubeMat);
     scene.add(quarantine);
     nodeGroup.quarantine = quarantine;
 
-    // Congelar y apagar el nodo
-    nodeGroup.mesh.material.color.setHex(0x555555);
-    nodeGroup.mesh.material.emissive.setHex(0x000000);
-    
-    // Romper la conexión instantáneamente
+    nodeGroup.mesh.material.color.setHex(0x8b949e);
     nodeGroup.line.material.opacity = 0;
     scene.remove(nodeGroup.particles);
 
-    // Destrucción total en 3 segundos
     setTimeout(() => {
       const activeNode = nodesMapRef.current.get(ip);
       if (activeNode) {
@@ -387,7 +411,22 @@ function App() {
     }, 3000);
   };
 
-  // Renderizar Gráfico de Entropía SVG
+  // --- UI TRIGGERS ---
+  const triggerSimulation = () => {
+    if (mode === 'DEMO') {
+      appendLog('🚀 INYECTANDO VECTOR DE EXFILTRACIÓN...', 'INFO');
+      const fakeIp = `192.168.1.${Math.floor(Math.random() * 255)}`;
+      handleKillSwitch(fakeIp, {x: 1, y: 1, z: 1, t: 0.42}, 8.9);
+    } else {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'START_SIMULATION' }));
+        appendLog('🚀 ORDEN ENVIADA AL PROXY: Lanzando ataque...', 'INFO');
+      } else {
+        appendLog('❌ ERROR: Sin conexión al WebSocket en Modo Producción.', 'CRITICAL');
+      }
+    }
+  };
+
   const renderEntropyGraph = () => {
     const width = 300;
     const height = 100;
@@ -401,8 +440,8 @@ function App() {
       <svg viewBox={`0 0 ${width} ${height}`} className="entropy-svg">
         <defs>
           <linearGradient id="gradientLine" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#00f2fe" />
-            <stop offset="100%" stopColor={isAnomaly ? "#ff0033" : "#00f2fe"} />
+            <stop offset="0%" stopColor="#00ff9d" />
+            <stop offset="100%" stopColor={isAnomaly ? "#ff0055" : "#00ff9d"} />
           </linearGradient>
         </defs>
         <polyline fill="none" stroke="url(#gradientLine)" strokeWidth="2" points={points} />
@@ -410,39 +449,49 @@ function App() {
     );
   };
 
-  const triggerSimulation = () => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'START_SIMULATION' }));
-      appendLog('🚀 ORDEN ENVIADA: Desplegando enjambre de ataque simulado...', 'INFO');
-    } else {
-      appendLog('❌ ERROR: Sin conexión al motor TZANiX.', 'CRITICAL');
-    }
-  };
-
   return (
     <div className={`dashboard-container ${isAnomaly ? 'screen-flash-alert' : ''}`}>
       <canvas ref={canvasRef} className="three-canvas" />
 
-      {/* Capa de Información Holográfica Frontal */}
       <div className="hud-overlay">
-        
         <header className="header glass-panel">
           <div className="brand">
-            <h1>TZANiX Q-Balam</h1>
-            <p className="subtitle">Radar Cuántico Empresarial 4D</p>
+            <h1>TZANiX Q-BALAM</h1>
+            <p className="subtitle">RADAR CUÁNTICO EMPRESARIAL 4D</p>
           </div>
-          <div className="actions">
+          
+          <div className="controls">
+            <select className="mode-select" value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="DEMO">MODO: SIMULACIÓN INTERACTIVA</option>
+              <option value="PROD">MODO: PRODUCCIÓN WEBSOCKET</option>
+            </select>
+            
+            {mode === 'PROD' && (
+              <input 
+                className="ws-input" 
+                value={wsUrl} 
+                onChange={(e) => setWsUrl(e.target.value)} 
+                placeholder="ws://localhost:8081"
+              />
+            )}
+
+            {mode === 'DEMO' && (
+              <button className="demo-btn" onClick={() => {
+                setDemoRunning(!demoRunning);
+                appendLog(demoRunning ? 'PAUSANDO RED DEMO.' : 'INICIANDO INYECCIÓN DE TRÁFICO DEMO.', 'INFO');
+              }}>
+                {demoRunning ? '⏸ PAUSAR DEMO' : '▶ INICIAR DEMO'}
+              </button>
+            )}
+
             <button className="simulate-btn" onClick={triggerSimulation}>
               ⚠ SIMULAR ATAQUE
             </button>
-            <div className={`status-badge ${isAnomaly ? 'alert' : ''}`}>
-              {isAnomaly ? 'DEFENSA ACTIVA: EXFILTRACIÓN BLOQUEADA' : 'ESTADO: NÚCLEO PROTEGIDO (Q-SECURE)'}
-            </div>
           </div>
         </header>
 
-        {/* Panel Inferior Izquierdo: Gráfico de Entropía */}
-        <div className="panel bottom-left glass-panel">
+        {/* Panel Izquierdo: Gráfico */}
+        <div className="panel left-panel glass-panel">
           <h3>Volatilidad y Entropía (ATR)</h3>
           <div className="entropy-graph-container">
             {renderEntropyGraph()}
@@ -463,8 +512,17 @@ function App() {
           </div>
         </div>
 
-        {/* Panel Inferior Derecho: Consola Táctica */}
-        <div className="panel bottom-right glass-panel console-panel">
+        {/* HUD Central Inferior */}
+        <div className="center-hud glass-panel">
+          <span className="status-indicator">ESTADO: {isAnomaly ? 'EXFILTRACIÓN BLOQUEADA' : 'Q-SECURE (NORMAL)'}</span>
+          <span className="separator">|</span>
+          <span className="latency-indicator">Latencia del Proxy: 0.42 ms</span>
+          <span className="separator">|</span>
+          <span className="threads-indicator">Hilos Rayon: 8 Activos</span>
+        </div>
+
+        {/* Panel Derecho: Terminal */}
+        <div className="panel right-panel glass-panel console-panel">
           <h3>Consola de Eventos del Motor</h3>
           <div className="terminal">
             {logs.map(log => (
@@ -473,10 +531,9 @@ function App() {
                 <span className="msg">{log.msg}</span>
               </div>
             ))}
-            {logs.length === 0 && <div className="log-entry info">Esperando eventos del Tesseract...</div>}
+            {logs.length === 0 && <div className="log-entry info">Esperando telemetría...</div>}
           </div>
         </div>
-
       </div>
     </div>
   );
