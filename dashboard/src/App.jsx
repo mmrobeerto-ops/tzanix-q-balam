@@ -80,11 +80,18 @@ function App() {
   // --- LÓGICA DE SIMULACIÓN (MODO DEMO) ---
   useEffect(() => {
     if (mode === 'DEMO' && demoRunning) {
-      appendLog('[3:25:20] ESTADO: Red protegida. Entropía de Shannon: 0.18 (Baja).', 'INFO');
+      if (attackPhase === 0) {
+        appendLog('[3:25:20] ESTADO: Red protegida. Entropía de Shannon: 0.18 (Baja).', 'INFO');
+      }
+      
+      // Bucle ultra rápido (50ms) para que la gráfica fluya
+      let timeOffset = 0;
       demoIntervalRef.current = setInterval(() => {
-        const entropy = 0.10 + (Math.random() * 0.05); // Fluctúa entre 10% y 15%
-        handleTrafficFlow("192.168.x.x", entropy * 8.0);
-      }, 500);
+        timeOffset += 0.1;
+        // Crear una onda base suave usando seno + pequeño ruido
+        const baseEntropy = 0.12 + Math.sin(timeOffset) * 0.03 + (Math.random() * 0.02);
+        handleTrafficFlow("192.168.x.x", baseEntropy * 8.0);
+      }, 50);
     } else {
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
     }
@@ -92,7 +99,7 @@ function App() {
     return () => {
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
     };
-  }, [mode, demoRunning]);
+  }, [mode, demoRunning, attackPhase]);
 
   const handleTrafficFlow = (source_ip, entropy_score) => {
     if (attackPhase !== 0) return; // Ignorar tráfico normal durante el ataque
@@ -109,7 +116,12 @@ function App() {
     setAttackPhase(1);
     const entropyPct = 0.98;
     setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
-    setEntropyHistory(prev => [...prev.slice(1), entropyPct]);
+    setEntropyHistory(prev => {
+       const newHist = [...prev];
+       newHist[newHist.length - 1] = entropyPct;
+       newHist[newHist.length - 2] = entropyPct - 0.1;
+       return newHist;
+    });
     appendLog(`ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
 
     // FASE 3: Activación Kill-Switch ATR (T=420ms)
@@ -121,6 +133,7 @@ function App() {
         updated.add(ip);
         return { ...prev, blockedIPs: updated };
       });
+      // Mantener entropía alta durante el bloqueo
       setEntropyHistory(prev => [...prev.slice(1), entropyPct]); 
     }, 420);
 
@@ -128,7 +141,10 @@ function App() {
     setTimeout(() => {
       setAttackPhase(3);
       setStats(prev => ({ ...prev, globalEntropy: 0.12 }));
-      setEntropyHistory(prev => [...prev.slice(1), 0.12]);
+      setEntropyHistory(prev => {
+        const newHist = [...prev.slice(1), 0.12];
+        return newHist;
+      });
       appendLog(`ESTADO: Red protegida. Pérdida de datos: 0.00%. Latencia Proxy: 0.38ms.`, 'INFO');
     }, 2500);
 
@@ -372,11 +388,23 @@ function App() {
   const renderEntropyGraph = () => {
     const width = 300;
     const height = 80;
-    const points = entropyHistory.map((val, i) => {
-      const x = (i / (entropyHistory.length - 1)) * width;
-      const y = height - (val * height);
-      return `${x},${y}`;
-    }).join(' ');
+    
+    if (entropyHistory.length === 0) return null;
+
+    let pathD = `M 0,${height - (entropyHistory[0] * height)}`;
+    for (let i = 1; i < entropyHistory.length; i++) {
+      const x0 = ((i - 1) / (entropyHistory.length - 1)) * width;
+      const y0 = height - (entropyHistory[i - 1] * height);
+      const x1 = (i / (entropyHistory.length - 1)) * width;
+      const y1 = height - (entropyHistory[i] * height);
+      
+      const cp1x = x0 + (x1 - x0) / 2;
+      const cp1y = y0;
+      const cp2x = x0 + (x1 - x0) / 2;
+      const cp2y = y1;
+      
+      pathD += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x1},${y1}`;
+    }
 
     const isAlertColor = attackPhase === 1 || attackPhase === 2;
 
@@ -388,7 +416,7 @@ function App() {
             <stop offset="100%" stopColor={isAlertColor ? "#FF2E63" : "#00F0FF"} />
           </linearGradient>
         </defs>
-        <polyline fill="none" stroke="url(#gradientLine)" strokeWidth="1.5" points={points} />
+        <path fill="none" stroke="url(#gradientLine)" strokeWidth="2.5" d={pathD} style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
     );
   };
