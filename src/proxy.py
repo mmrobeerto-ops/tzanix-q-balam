@@ -9,6 +9,7 @@ import os
 import websockets
 import json
 import datetime
+import subprocess
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -34,7 +35,17 @@ class QGuardSidecar:
     async def ws_handler(self, websocket):
         self.ws_clients.add(websocket)
         try:
-            await websocket.wait_closed()
+            async for message in websocket:
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "START_SIMULATION":
+                        logging.info("🚀 Iniciando simulación de ataque a pedido del Dashboard...")
+                        # Ejecutar tester sin bloquear el event loop principal
+                        subprocess.Popen(["python", "tests/stress_tester.py"])
+                except Exception as e:
+                    logging.error(f"Error procesando mensaje WS: {e}")
+        except Exception:
+            pass
         finally:
             self.ws_clients.remove(websocket)
 

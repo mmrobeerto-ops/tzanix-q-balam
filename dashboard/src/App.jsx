@@ -410,6 +410,15 @@ function App() {
     );
   };
 
+  const triggerSimulation = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'START_SIMULATION' }));
+      appendLog('🚀 ORDEN ENVIADA: Desplegando enjambre de ataque simulado...', 'INFO');
+    } else {
+      appendLog('❌ ERROR: Sin conexión al motor TZANiX.', 'CRITICAL');
+    }
+  };
+
   return (
     <div className={`dashboard-container ${isAnomaly ? 'screen-flash-alert' : ''}`}>
       <canvas ref={canvasRef} className="three-canvas" />
@@ -422,8 +431,13 @@ function App() {
             <h1>TZANiX Q-Balam</h1>
             <p className="subtitle">Radar Cuántico Empresarial 4D</p>
           </div>
-          <div className={`status-badge ${isAnomaly ? 'alert' : ''}`}>
-            {isAnomaly ? 'DEFENSA ACTIVA: EXFILTRACIÓN BLOQUEADA' : 'ESTADO: NÚCLEO PROTEGIDO (Q-SECURE)'}
+          <div className="actions">
+            <button className="simulate-btn" onClick={triggerSimulation}>
+              ⚠ SIMULAR ATAQUE
+            </button>
+            <div className={`status-badge ${isAnomaly ? 'alert' : ''}`}>
+              {isAnomaly ? 'DEFENSA ACTIVA: EXFILTRACIÓN BLOQUEADA' : 'ESTADO: NÚCLEO PROTEGIDO (Q-SECURE)'}
+            </div>
           </div>
         </header>
 
