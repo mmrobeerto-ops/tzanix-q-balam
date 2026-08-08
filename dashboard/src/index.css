@@ -1,27 +1,19 @@
 :root {
   font-family: 'Inter', 'Outfit', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
   color-scheme: dark;
-  color: rgba(255, 255, 255, 0.9);
-  background-color: #05050f;
-  min-height: 100vh;
   margin: 0;
-  overflow-x: hidden;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  background-color: #05050f;
+  color: #fff;
 }
 
-*, *::before, *::after {
-  box-sizing: inherit;
-}
-
-/* 3D Canvas de Fondo */
+/* 3D Canvas al fondo absoluto */
 .three-canvas {
   position: fixed;
   top: 0;
@@ -29,264 +21,185 @@ body {
   width: 100vw;
   height: 100vh;
   z-index: 1;
-  pointer-events: none; /* Dejar pasar interacciones a las tarjetas */
 }
 
-/* Contenedor Principal */
-.dashboard-container {
-  position: relative;
-  z-index: 2;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
-  width: 100%;
-  min-height: 100vh;
+/* HUD Overlay: Capa táctica por encima del 3D */
+.hud-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10;
+  pointer-events: none; /* Deja pasar clicks al 3D si hubiera interactividad */
   display: flex;
   flex-direction: column;
+  padding: 2rem;
+  box-sizing: border-box;
 }
 
-/* Cabecera */
+/* Paneles Glassmorphism Tácticos */
+.glass-panel {
+  background: rgba(5, 10, 20, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Header Superior */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem 2rem;
+  width: 100%;
 }
 
 .brand h1 {
-  font-size: 2.2rem;
   margin: 0;
-  background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
+  font-size: 1.8rem;
+  background: linear-gradient(90deg, #00f2fe, #4facfe);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-transform: uppercase;
   letter-spacing: 2px;
-  font-weight: 800;
 }
 
 .brand .subtitle {
-  margin: 0.2rem 0 0 0;
-  font-size: 0.9rem;
-  color: #71717a;
-  letter-spacing: 1px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #00f2fe;
   text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-/* Status Badge */
 .status-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 1.2rem;
-  border-radius: 50px;
-  background: rgba(16, 185, 129, 0.1);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.15);
   color: #10b981;
   font-weight: bold;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .status-badge.alert {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
-  animation: pulse 1s infinite alternate;
+  background: rgba(255, 0, 51, 0.2);
+  color: #ff0033;
+  border-color: #ff0033;
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.5);
 }
 
-.status-badge .dot {
-  font-size: 1.1rem;
+/* Paneles Flotantes Inferiores */
+.panel {
+  position: absolute;
+  bottom: 2rem;
+  padding: 1.5rem;
+  width: 400px;
 }
 
-@keyframes pulse {
-  0% { opacity: 0.85; }
-  100% { opacity: 1; box-shadow: 0 0 30px rgba(239, 68, 68, 0.55); }
+.bottom-left {
+  left: 2rem;
 }
 
-/* Grid de Tarjetas */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
-  flex-grow: 1;
+.bottom-right {
+  right: 2rem;
 }
 
-.col-span-2 {
-  grid-column: span 2;
-}
-
-/* Tarjetas Estilo Glassmorphism */
-.card.glass {
-  background: rgba(10, 10, 20, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 20px;
-  padding: 1.8rem;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card.glass:hover {
-  border-color: rgba(0, 242, 254, 0.35);
-  box-shadow: 0 8px 32px 0 rgba(0, 242, 254, 0.1);
-}
-
-.card h2 {
-  font-size: 1.1rem;
-  color: #a1a1aa;
+.panel h3 {
   margin-top: 0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #00f2fe;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-left: 3px solid #00f2fe;
-  padding-left: 0.8rem;
+  border-bottom: 1px solid rgba(0, 242, 254, 0.3);
+  padding-bottom: 0.5rem;
 }
 
-.card .description {
-  color: #a1a1aa;
-  font-size: 0.95rem;
-  line-height: 1.6;
+/* Gráfico de Entropía */
+.entropy-graph-container {
+  width: 100%;
+  height: 100px;
+  background: rgba(0, 242, 254, 0.05);
+  border: 1px dashed rgba(0, 242, 254, 0.2);
+  border-radius: 4px;
+  margin-bottom: 1rem;
 }
 
-/* Elementos de Métricas */
-.stat-row {
+.entropy-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Métricas en Grid */
+.stat-grid {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.stat-row:last-of-type {
-  border-bottom: none;
+.stat-grid div {
+  display: flex;
+  flex-direction: column;
 }
 
-.stat-label {
-  color: #71717a;
-  font-size: 0.95rem;
+.stat-grid .label {
+  font-size: 0.7rem;
+  color: #8899aa;
+  margin-bottom: 0.2rem;
 }
 
-.stat-val {
+.stat-grid .val {
   font-size: 1.2rem;
   font-weight: bold;
 }
 
-.color-cyan { color: #00f2fe; }
-.color-green { color: #10b981; }
-.color-red { color: #ef4444; }
+.cyan { color: #00f2fe; }
+.red { color: #ff0033; }
+.green { color: #10b981; }
 
-.event-log {
-  margin-top: 1.5rem;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.8rem 1.2rem;
-  border-radius: 8px;
-  border-left: 2px solid #a1a1aa;
+/* Consola de Eventos (Terminal) */
+.console-panel {
+  width: 500px;
 }
 
-.event-tag {
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: #71717a;
-}
-
-.event-text {
-  margin: 0.3rem 0 0 0;
-  font-family: monospace;
-  font-size: 0.9rem;
-  color: #e4e4e7;
-}
-
-.limit-gauge {
-  margin-top: 2rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  padding: 1.2rem;
-  border-radius: 12px;
+.terminal {
+  height: 180px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.gauge-label {
-  color: #a1a1aa;
-  font-size: 0.9rem;
+/* Ocultar scrollbar para estética más limpia */
+.terminal::-webkit-scrollbar { width: 4px; }
+.terminal::-webkit-scrollbar-thumb { background: rgba(0, 242, 254, 0.5); }
+
+.log-entry {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.gauge-val {
-  font-weight: 800;
-  letter-spacing: 1px;
+.log-entry .time {
+  color: #8899aa;
 }
 
-/* Tabla de Logs */
-.table-container {
-  overflow-x: auto;
-}
+.log-entry.info .msg { color: #00f2fe; }
+.log-entry.warn .msg { color: #ffaa00; }
+.log-entry.critical .msg { color: #ff0033; font-weight: bold; }
+.log-entry.success .msg { color: #10b981; }
 
-.log-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.log-table th, .log-table td {
-  padding: 0.9rem 1rem;
-  text-align: left;
-  font-size: 0.9rem;
-}
-
-.log-table th {
-  color: #71717a;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  font-weight: bold;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
-}
-
-.log-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.log-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.log-table .empty-row {
-  text-align: center;
-  color: #71717a;
-  padding: 2rem 0;
-}
-
-.row-blocked {
-  background: rgba(239, 68, 68, 0.08) !important;
-}
-
-.row-blocked:hover {
-  background: rgba(239, 68, 68, 0.12) !important;
-}
-
-.text-red { color: #ef4444; font-weight: bold; }
-.text-green { color: #10b981; font-weight: bold; }
-
-/* Efecto Alerta de Pantalla Completa (Flash) */
+/* Efecto Flash Rojo General */
 .screen-flash-alert {
-  animation: screenFlash 2s ease-out;
+  animation: bgFlash 2s ease-out;
 }
 
-@keyframes screenFlash {
-  0% { background-color: rgba(239, 68, 68, 0.2); }
-  100% { background-color: #05050f; }
-}
-
-/* Adaptabilidad Móvil */
-@media (max-width: 900px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-  .col-span-2 {
-    grid-column: span 1;
-  }
+@keyframes bgFlash {
+  0% { box-shadow: inset 0 0 150px rgba(255, 0, 51, 0.6); }
+  100% { box-shadow: inset 0 0 0 rgba(255, 0, 51, 0); }
 }
