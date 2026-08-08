@@ -445,7 +445,7 @@ function App() {
     if (activeGate === 'GATE2_ATTACK') return 'ANOMALÍA DETECTADA';
     if (activeGate === 'GATE2_KILL') return 'EXFILTRACIÓN BLOQUEADA';
     if (activeGate === 'GATE2_RESTORE') return 'RESTAURANDO ESTADO...';
-    return 'NÚCLEO PROTEGIDO (Q-SECURE)';
+    return 'NÚCLEO PROTEGIDO';
   };
 
   const isAlertState = activeGate === 'GATE2_ATTACK' || activeGate === 'GATE2_KILL';
@@ -472,7 +472,7 @@ function App() {
         {/* TOP BAR - COMMAND CENTER */}
         <header className="header glass-panel">
           <div className="brand">
-            <h1>TZANiX Q-GUARD</h1>
+            <h1>TZANiX Q-Balam</h1>
           </div>
           
           <div className="top-metrics">
@@ -533,7 +533,7 @@ function App() {
                onClick={executeGate1}
                disabled={!!activeGate}
              >
-               [RUN GATE 1: STRESS TEST]
+               [ GATE 1: STRESS TEST ]
              </button>
 
              <button 
@@ -541,7 +541,7 @@ function App() {
                onClick={() => executeGate2()}
                disabled={!!activeGate}
              >
-               [RUN GATE 2: EXFILTRATION]
+               [ GATE 2: EXFILTRATION ]
              </button>
 
              <button 
@@ -549,7 +549,7 @@ function App() {
                onClick={executeGate3}
                disabled={!!activeGate}
              >
-               [RUN GATE 3: STABILITY]
+               [ GATE 3: STABILITY ]
              </button>
           </div>
           
