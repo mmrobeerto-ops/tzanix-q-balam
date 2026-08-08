@@ -218,20 +218,27 @@ function App() {
     scene.add(coreMesh);
     const coreRef = coreMesh;
 
-    // 3. Lazos de Datos (Líneas Vectoriales Dinámicas)
-    const linksCount = 100; // Incrementado para mayor conexión
+    // 3. Lazos Estructurales (8 Ejes Core-Perímetro)
+    const linksCount = 8;
     const linksGeo = new THREE.BufferGeometry();
     const linksPos = new Float32Array(linksCount * 6);
+    
+    // Puntos fijos para simular los 8 vértices principales
+    const coreVertices = [
+       new THREE.Vector3(1, 1, 1), new THREE.Vector3(1, 1, -1),
+       new THREE.Vector3(1, -1, 1), new THREE.Vector3(1, -1, -1),
+       new THREE.Vector3(-1, 1, 1), new THREE.Vector3(-1, 1, -1),
+       new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, -1, -1)
+    ];
+
     for(let i=0; i<linksCount; i++) {
-        // Start: Punto aleatorio en el núcleo (R=2)
-        const d1 = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(2);
-        // End: Punto aleatorio en la periferia (R=5 a 6)
-        const d2 = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(5 + Math.random());
+        const d1 = coreVertices[i].clone().normalize().multiplyScalar(2);
+        const d2 = coreVertices[i].clone().normalize().multiplyScalar(5.5);
         linksPos[i*6] = d1.x; linksPos[i*6+1] = d1.y; linksPos[i*6+2] = d1.z;
         linksPos[i*6+3] = d2.x; linksPos[i*6+4] = d2.y; linksPos[i*6+5] = d2.z;
     }
     linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPos, 3));
-    const linksMat = new THREE.LineBasicMaterial({ color: 0x10ff88, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+    const linksMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
     const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMat);
     scene.add(dataLinksMesh);
 
