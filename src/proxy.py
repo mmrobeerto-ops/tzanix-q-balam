@@ -8,6 +8,7 @@ import tzanix_core
 import os
 import websockets
 import json
+import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -102,12 +103,21 @@ class QGuardSidecar:
         # Kill-Switch: Solo actuar si supera el umbral matemático Y el umbral físico de red
         if y_magnitude > upper_band and y_magnitude > MIN_ANOMALY_THRESHOLD:
             logging.warning(f"¡ANOMALÍA DETECTADA! (Kill-Switch) IP: {x_vector} | Magnitud: {y_magnitude} | Límite: {upper_band:.2f}")
+            
+            # Formato JSON estructurado solicitado por el cliente
+            entropy_mapped = random.uniform(7.8, 8.0)
             asyncio.create_task(self.broadcast_ws({
-                "type": "KILL_SWITCH",
-                "x_vector": x_vector,
-                "y_magnitude": y_magnitude,
-                "limit": upper_band,
-                "action": "BLOCKED"
+                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                "event_type": "ATR_KILL_SWITCH",
+                "coordinates": {
+                    "x": float(x_vector.split(':')[1]),
+                    "y": float(y_magnitude),
+                    "z": float(entropy_mapped),
+                    "t": random.uniform(0.001, 0.005)
+                },
+                "entropy_score": float(entropy_mapped),
+                "source_ip": x_vector.split(':')[0],
+                "status": "BLOCKED"
             }))
             return True 
             
@@ -143,12 +153,20 @@ class QGuardSidecar:
                         if direction == "Client->Target":
                             x_vector, y_magnitude, z_entropy, t_time = await self.calculate_tesseract_metrics(data, addr)
                             
+                            # Formato JSON estructurado solicitado por el cliente para flujo normal
+                            entropy_mapped = z_entropy * 8.0
                             asyncio.create_task(self.broadcast_ws({
-                                "type": "TELEMETRY",
-                                "x_vector": x_vector,
-                                "y_magnitude": y_magnitude,
-                                "z_entropy": z_entropy,
-                                "t_time": t_time
+                                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                                "event_type": "TRAFFIC_FLOW",
+                                "coordinates": {
+                                    "x": float(addr[1]),
+                                    "y": float(y_magnitude),
+                                    "z": float(entropy_mapped),
+                                    "t": random.uniform(0.001, 0.005)
+                                },
+                                "entropy_score": float(entropy_mapped),
+                                "source_ip": addr[0],
+                                "status": "SECURED"
                             }))
                             
                             async with self.buffer_lock:

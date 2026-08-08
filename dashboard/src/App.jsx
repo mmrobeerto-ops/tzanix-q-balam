@@ -37,15 +37,15 @@ function App() {
           const data = JSON.parse(event.data);
           const timestamp = new Date().toLocaleTimeString();
 
-          if (data.type === 'TELEMETRY') {
-            const ip = data.x_vector;
+          if (data.event_type === 'TRAFFIC_FLOW') {
+            const ip = `${data.source_ip}:${Math.floor(data.coordinates.x)}`;
             
             // Registrar log en tabla
             const newLog = {
               id: Math.random(),
               x_ip: ip,
-              y_bytes: data.y_magnitude,
-              z_entropy: data.z_entropy.toFixed(2),
+              y_bytes: data.coordinates.y,
+              z_entropy: data.entropy_score.toFixed(2),
               t_time: timestamp,
               status: 'SECURED'
             };
@@ -55,15 +55,15 @@ function App() {
             // Actualizar métricas
             setStats(prev => ({
               ...prev,
-              globalEntropy: data.z_entropy,
+              globalEntropy: data.entropy_score / 8.0, // Convertir escala 0-8 a 0-1
               lastEvent: `Tráfico desde ${ip}`
             }));
 
             // Generar o refrescar nodo 3D
-            trigger3DNodeTelemetry(ip, data.y_magnitude, data.z_entropy);
+            trigger3DNodeTelemetry(ip, data.coordinates.y, data.entropy_score / 8.0);
 
-          } else if (data.type === 'KILL_SWITCH') {
-            const ip = data.x_vector;
+          } else if (data.event_type === 'ATR_KILL_SWITCH') {
+            const ip = `${data.source_ip}:${Math.floor(data.coordinates.x)}`;
             setIsAnomaly(true);
             setTimeout(() => setIsAnomaly(false), 4000);
 
@@ -71,7 +71,7 @@ function App() {
             const newLog = {
               id: Math.random(),
               x_ip: ip,
-              y_bytes: data.y_magnitude,
+              y_bytes: data.coordinates.y,
               z_entropy: '0.00',
               t_time: timestamp,
               status: 'BLOCKED'
