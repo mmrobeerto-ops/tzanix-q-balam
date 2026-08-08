@@ -10,7 +10,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   
   // null = Seguro. 
-  // 'GATE1', 'GATE2_ATTACK', 'GATE2_KILL', 'GATE2_RESTORE', 'GATE3'
+  // 'GATE2_ATTACK', 'GATE2_KILL', 'GATE2_RESTORE'
   const [activeGate, setActiveGate] = useState(null); 
   
   const [stats, setStats] = useState({
@@ -101,34 +101,13 @@ function App() {
   }, [mode, demoRunning, activeGate]);
 
   const handleTrafficFlow = (source_ip, entropy_score) => {
-    if (activeGate && activeGate.startsWith('GATE2')) return; // Bloquear solo en gate 2
+    if (activeGate) return; 
 
     let currentEntropy = Math.min(entropy_score / 8.0, 1.0);
     let connections = 10000 + Math.floor(Math.random() * 1000);
 
-    // Si estamos en GATE 1 (Carga masiva) o GATE 3 (Cámara rápida)
-    if (activeGate === 'GATE1') {
-       connections = 25000 + Math.floor(Math.random() * 5000);
-       currentEntropy = 0.15 + (Math.random() * 0.05);
-    } else if (activeGate === 'GATE3') {
-       connections = 10000 + Math.floor(Math.sin(Date.now() / 100) * 8000);
-       currentEntropy = 0.12 + (Math.random() * 0.02);
-    }
-
     setStats(prev => ({ ...prev, globalEntropy: currentEntropy, activeConnections: connections }));
     setEntropyHistory(prev => [...prev.slice(1), currentEntropy]);
-  };
-
-  // --- GATE 1: STRESS & LATENCY ---
-  const executeGate1 = () => {
-    if (activeGate) return;
-    setActiveGate('GATE1');
-    appendLog(`[GATE 1] INYECTANDO 10,000 RPS. LATENCIA ESTABLE. ZERO PACKET LOSS.`, 'WARN');
-    
-    setTimeout(() => {
-      setActiveGate(null);
-      appendLog(`[GATE 1 COMPLETO] Rendimiento validado con éxito.`, 'SUCCESS');
-    }, 4000);
   };
 
   // --- GATE 2: ENTROPY & EXFILTRATION (El Kill-Switch) ---
@@ -144,7 +123,7 @@ function App() {
        newHist[newHist.length - 2] = entropyPct - 0.1;
        return newHist;
     });
-    appendLog(`[GATE 2] ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
+    appendLog(`ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
 
     setTimeout(() => {
       setActiveGate('GATE2_KILL');
@@ -165,18 +144,6 @@ function App() {
     }, 2500);
 
     setTimeout(() => setActiveGate(null), 4000);
-  };
-
-  // --- GATE 3: STABILITY (24H ZERO FALSE POSITIVES) ---
-  const executeGate3 = () => {
-    if (activeGate) return;
-    setActiveGate('GATE3');
-    appendLog(`[GATE 3] SIMULACIÓN 24H ACELERADA. TRÁFICO CORPORATIVO PESADO.`, 'WARN');
-    
-    setTimeout(() => {
-      setActiveGate(null);
-      appendLog(`[GATE 3 COMPLETO] Falsos Positivos: 0. Estabilidad 100%.`, 'SUCCESS');
-    }, 5000);
   };
 
 
@@ -200,8 +167,7 @@ function App() {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
+    controls.autoRotate = false; // Desactivado para rotación manual por componente
 
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
@@ -213,6 +179,7 @@ function App() {
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
+    // 1. Matriz Exterior (Nube de Partículas)
     const particlesCount = 8000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particlesCount * 3);
@@ -243,13 +210,56 @@ function App() {
     scene.add(particlesMesh);
     pointsRef.current = particlesMesh;
 
-    // Tesseract Core
+    // 2. Tesseract Core (Hipercubo 4D)
     const coreGeo = new THREE.IcosahedronGeometry(2, 1);
     const coreEdges = new THREE.EdgesGeometry(coreGeo);
-    const coreMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+    const coreMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
     const coreMesh = new THREE.LineSegments(coreEdges, coreMat);
     scene.add(coreMesh);
     const coreRef = coreMesh;
+
+    // 3. Lazos de Datos (Líneas Vectoriales Dinámicas)
+    const linksCount = 60;
+    const linksGeo = new THREE.BufferGeometry();
+    const linksPos = new Float32Array(linksCount * 6);
+    for(let i=0; i<linksCount; i++) {
+        // Start: Punto aleatorio en el núcleo (R=2)
+        const d1 = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(2);
+        // End: Punto aleatorio en la periferia (R=5 a 6)
+        const d2 = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(5 + Math.random());
+        linksPos[i*6] = d1.x; linksPos[i*6+1] = d1.y; linksPos[i*6+2] = d1.z;
+        linksPos[i*6+3] = d2.x; linksPos[i*6+4] = d2.y; linksPos[i*6+5] = d2.z;
+    }
+    linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPos, 3));
+    const linksMat = new THREE.LineBasicMaterial({ color: 0x00ffa3, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending });
+    const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMat);
+    scene.add(dataLinksMesh);
+
+    // 4. Partículas en Tránsito (Inbound Flow)
+    const inboundCount = 30;
+    const inboundGeo = new THREE.BufferGeometry();
+    const inboundPos = new Float32Array(inboundCount * 3);
+    const inboundDirs = [];
+    const inboundDistances = [];
+    
+    for(let i=0; i<inboundCount; i++) {
+        const dir = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+        inboundDirs.push(dir);
+        inboundDistances.push(6 + Math.random() * 2); 
+    }
+    inboundGeo.setAttribute('position', new THREE.BufferAttribute(inboundPos, 3));
+    const inboundMat = new THREE.PointsMaterial({ size: 0.15, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const inboundMesh = new THREE.Points(inboundGeo, inboundMat);
+    scene.add(inboundMesh);
+
+    // 5. Pulso de Entropía (Heartbeat)
+    const pulseGeo = new THREE.TorusGeometry(1, 0.02, 16, 100);
+    const pulseMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+    const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
+    pulseMesh.rotation.x = Math.PI / 2;
+    scene.add(pulseMesh);
+    let lastPulseTime = 0;
+
 
     const vectorsGroup = new THREE.Group();
     scene.add(vectorsGroup);
@@ -274,8 +284,57 @@ function App() {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
         const originals = originalPositionsRef.current;
         
-        // NORMAL / GATE 1 / GATE 3 (Red Turquesa)
-        if (!gate || gate === 'GATE1' || gate === 'GATE3' || gate === 'GATE2_RESTORE') {
+        // EFECTO GIROSCOPIO 4D (Rotación Opuesta Constante)
+        if (gate !== 'GATE2_ATTACK' && gate !== 'GATE2_KILL') {
+            coreRef.rotation.x += 0.01;
+            coreRef.rotation.z += 0.015;
+            pointsRef.current.rotation.y -= 0.003; // Nube externa gira al revés
+            dataLinksMesh.rotation.y -= 0.003; 
+        }
+
+        // PULSO DE ENTROPÍA (Cada 2.5s)
+        if (!gate || gate === 'GATE2_RESTORE') {
+           if (elapsedTime - lastPulseTime > 2.5) {
+               pulseMesh.scale.set(0.1, 0.1, 0.1);
+               pulseMesh.material.opacity = 0.8;
+               lastPulseTime = elapsedTime;
+           }
+           pulseMesh.scale.addScalar(0.08);
+           pulseMesh.material.opacity -= 0.02;
+        } else {
+           pulseMesh.material.opacity = 0; // Ocultar durante ataque
+        }
+
+        // LAZOS DE DATOS DINÁMICOS
+        if (gate === 'GATE2_ATTACK') {
+            linksMat.color.setHex(0xff2e63);
+            linksMat.opacity = Math.random() * 0.8;
+        } else {
+            linksMat.color.setHex(0x00ffa3);
+            linksMat.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.3; // Parpadeo estilo fibra óptica
+        }
+
+        // TRÁNSITO INBOUND
+        const inPos = inboundMesh.geometry.attributes.position.array;
+        let speed = 0.02;
+        if (gate === 'GATE2_ATTACK') { speed = 0.1; inboundMat.color.setHex(0xff2e63); }
+        else if (gate === 'GATE2_KILL') { speed = 0.0; inboundMat.opacity -= 0.05; }
+        else { speed = 0.02; inboundMat.color.setHex(0xffffff); inboundMat.opacity = 1; }
+
+        for(let i=0; i<inboundCount; i++) {
+            inboundDistances[i] -= speed;
+            if (inboundDistances[i] < 2) inboundDistances[i] = 6 + Math.random() * 2; // Reset al borde
+            const d = inboundDirs[i];
+            const dist = inboundDistances[i];
+            inPos[i*3] = d.x * dist;
+            inPos[i*3+1] = d.y * dist;
+            inPos[i*3+2] = d.z * dist;
+        }
+        inboundMesh.geometry.attributes.position.needsUpdate = true;
+
+
+        // ESTADO NORMAL (Red Turquesa)
+        if (!gate || gate === 'GATE2_RESTORE') {
             pointsRef.current.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
             coreRef.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
@@ -286,22 +345,12 @@ function App() {
                localShockwave = null;
             }
 
-            // Velocidad de rotación base
-            let rotSpeed = 0.2;
-            let waveSpeed = 2.0;
-
-            if (gate === 'GATE1') { rotSpeed = 0.8; waveSpeed = 8.0; } // Estrés
-            if (gate === 'GATE3') { rotSpeed = 5.0; waveSpeed = 15.0; } // Fast forward 24h
-
-            coreRef.rotation.y += rotSpeed * 0.02;
-            coreRef.rotation.x += rotSpeed * 0.01;
-
             for(let i = 0; i < particlesCount; i++) {
                 const ix = i * 3;
                 let px = originals[ix];
                 let py = originals[ix+1];
                 let pz = originals[ix+2];
-                const wave = Math.sin(elapsedTime * waveSpeed + px * 0.5) * 0.1;
+                const wave = Math.sin(elapsedTime * 2.0 + px * 0.5) * 0.1;
                 
                 posAttr[ix] = THREE.MathUtils.lerp(posAttr[ix], px, 0.1);
                 posAttr[ix+1] = THREE.MathUtils.lerp(posAttr[ix+1], py + wave, 0.1);
@@ -314,8 +363,9 @@ function App() {
             coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
 
-            coreRef.rotation.y += (Math.random() - 0.5) * 0.1;
-            coreRef.rotation.x += (Math.random() - 0.5) * 0.1;
+            coreRef.rotation.y += (Math.random() - 0.5) * 0.2;
+            coreRef.rotation.x += (Math.random() - 0.5) * 0.2;
+            pointsRef.current.rotation.y += (Math.random() - 0.5) * 0.05; // Sacudida esférica
 
             if (vectorsGroup.children.length === 0) {
                 for (let j = 0; j < 15; j++) {
@@ -343,7 +393,10 @@ function App() {
         else if (gate === 'GATE2_KILL') {
             pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
             coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
-            coreRef.rotation.y += 0.005; 
+            
+            // Frenado Inercial
+            coreRef.rotation.x += 0.001; 
+            pointsRef.current.rotation.y -= 0.0005;
 
             vectorsGroup.children.forEach(child => child.material.opacity -= 0.1);
 
@@ -440,8 +493,6 @@ function App() {
   };
 
   const getStatusText = () => {
-    if (activeGate === 'GATE1') return 'GATE 1: STRESS TEST (10k RPS)';
-    if (activeGate === 'GATE3') return 'GATE 3: 24H STABILITY SIMULATION';
     if (activeGate === 'GATE2_ATTACK') return 'ANOMALÍA DETECTADA';
     if (activeGate === 'GATE2_KILL') return 'EXFILTRACIÓN BLOQUEADA';
     if (activeGate === 'GATE2_RESTORE') return 'RESTAURANDO ESTADO...';
@@ -451,15 +502,11 @@ function App() {
   const isAlertState = activeGate === 'GATE2_ATTACK' || activeGate === 'GATE2_KILL';
   
   const getLatency = () => {
-    if (activeGate === 'GATE1') return (0.80 + Math.random() * 0.19).toFixed(2);
-    if (activeGate === 'GATE3') return (0.45 + Math.random() * 0.20).toFixed(2);
     return '0.38';
   };
 
   const getFrequency = () => {
     if (isAlertState) return '98.50';
-    if (activeGate === 'GATE1') return (25.00 + Math.random()).toFixed(2);
-    if (activeGate === 'GATE3') return (60.00 + Math.random()*10).toFixed(2);
     return (5.00 + Math.random()*0.1).toFixed(2);
   };
 
@@ -517,7 +564,7 @@ function App() {
             </ul>
           </div>
 
-          {/* CENTER ACTIONS (GATES) */}
+          {/* CENTER ACTIONS */}
           <div className="center-actions">
             
              <div className="simulation-controls">
@@ -538,28 +585,13 @@ function App() {
 
              <div className="gates-panel">
                <button 
-                 className={`action-btn stress-btn ${!activeGate ? 'pulse-cyan' : 'disabled'}`} 
-                 onClick={executeGate1}
+                 className={`action-btn alert-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
+                 onClick={() => executeGate2()}
                  disabled={!!activeGate}
                >
-                 [ GATE 1: STRESS TEST ]
+                 {activeGate ? '[ SISTEMA EN RESPUESTA ]' : '[ SIMULAR ATAQUE ]'}
                </button>
-
-             <button 
-               className={`action-btn alert-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
-               onClick={() => executeGate2()}
-               disabled={!!activeGate}
-             >
-               [ GATE 2: EXFILTRATION ]
-             </button>
-
-             <button 
-               className={`action-btn stability-btn ${!activeGate ? 'pulse-cyan' : 'disabled'}`} 
-               onClick={executeGate3}
-               disabled={!!activeGate}
-             >
-               [ GATE 3: STABILITY ]
-             </button>
+             </div>
           </div>
           
         </div>
