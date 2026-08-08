@@ -596,16 +596,20 @@ function App() {
           
         </div>
 
-        {/* BOTTOM RIGHT - CONSOLE */}
+        {/* RIGHT PANEL - CONSOLE */}
         <div className="panel right-panel glass-panel console-panel">
           <div className="terminal">
-            {logs.map(log => (
-              <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
-                <span className="time">{'>'} {log.msg.includes('[') ? '' : `[${log.time}] `}</span>
-                <span className="msg">{log.msg}</span>
-              </div>
-            ))}
-            {logs.length === 0 && <div className="log-entry info">System initializing...</div>}
+            {logs.map(log => {
+              const hasBracket = log.msg.startsWith('[');
+              const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
+              return (
+                <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
+                  <span className="time">{timeStr}</span>
+                  <span className="msg">{log.msg}</span>
+                </div>
+              );
+            })}
+            {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">System initializing...</span></div>}
           </div>
         </div>
 

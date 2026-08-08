@@ -333,32 +333,44 @@ body {
 /* Right Panel (Consola) */
 .right-panel {
   position: absolute;
-  bottom: 2rem;
   right: 2rem;
-  width: 400px;
-  height: 200px;
+  top: 6rem;
+  width: 360px;
+  max-height: 250px;
+  overflow-y: auto;
+  pointer-events: auto;
 }
 
 .terminal {
-  height: 100%;
-  overflow-y: auto;
-  font-size: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 1rem;
 }
 
 .terminal::-webkit-scrollbar { width: 4px; }
 .terminal::-webkit-scrollbar-thumb { background: #1A2333; }
 
 .log-entry {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.75rem;
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
   display: flex;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.4rem;
 }
 
-.log-entry .time { color: #8B949E; }
-.log-entry.info .msg { color: #8B949E; } /* Mensajes normales en gris claro */
+.log-entry .time { 
+  color: rgba(255, 255, 255, 0.5); 
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.log-entry .msg {
+  flex: 1;
+  word-wrap: break-word;
+}
+
+.log-entry.info .msg { color: #8B949E; }
 .log-entry.warn .msg { color: #FF2E63; }
 .log-entry.critical .msg { color: #FF2E63; font-weight: bold; }
 .log-entry.success .msg { color: #00E5FF; }
