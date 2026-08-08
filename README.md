@@ -1,4 +1,4 @@
-# TZANiX Q-Guard + Quantum Engine (Edición Comunitaria)
+# TZANiX Q-Balam (Edición Comunitaria)
 
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
@@ -13,21 +13,21 @@ TZANiX es una plataforma dual diseñada para mitigar la amenaza de **"Cosechar A
 
 TZANiX no es solo un proxy invisible en una terminal; es un ecosistema completo compuesto por dos piezas tecnológicas que se comunican a la velocidad de la luz:
 
-### 1. TZANiX Q-Guard (El Escudo Activo / Backend)
-Escrito en Python (con núcleo acelerado en Rust), Q-Guard es el proxy inverso que está en la trinchera.
+### 1. TZANiX Q-Balam (El Escudo Activo / Backend)
+Escrito en Python (con núcleo acelerado en Rust), Q-Balam es el proxy inverso que está en la trinchera.
 *   **Inyección de Entropía ($Z$):** Intercepta el tráfico y añade ruido matemático para que cualquier dato robado sea ruido blanco estadísticamente indescifrable.
 *   **Filtro Volumétrico ATR:** Mide el *Average True Range* del volumen de datos ($Y$). Si detecta una exfiltración masiva (ej. ataque DDoS Slowloris o volcado masivo de base de datos), activa un **Kill-Switch** que decapita el socket TCP del atacante instantáneamente.
 
 ### 2. TZANiX Quantum Engine (El Radar Holográfico / Frontend)
 Escrito en **Rust + WebAssembly + Three.js** (Próximamente integrado en este repositorio), este es el cerebro visual.
-*   Q-Guard transmite la telemetría del tráfico a través de **WebSockets** hacia el Quantum Engine.
+*   Q-Balam transmite la telemetría del tráfico a través de **WebSockets** hacia el Quantum Engine.
 *   El motor renderiza a 60 FPS en el navegador una topología cuántica en 3D. Un CEO, CTO o inversor puede *ver* cómo fluyen los datos y observar en tiempo real cómo un servidor se ilumina en rojo y destruye un ataque antes de que afecte la red.
 
 ---
 
 ## ⚡ Quick Start (Backend Actual)
 
-### 1. Ejecutar el Escudo Q-Guard
+### 1. Ejecutar el Escudo Q-Balam
 ```bash
 python src/proxy.py
 ```
@@ -71,7 +71,7 @@ Sometimos a Q-Guard a una prueba de estrés I/O bajo tráfico masivo de conexion
 Este repositorio contiene la base comunitaria de intercepción (Apache 2.0).
 Sin embargo, el verdadero valor comercial para bancos, exchanges y corporaciones se encuentra en **TZANiX Enterprise**.
 
-Mientras el Ingeniero de Redes utiliza la eficiencia de Q-Guard para asegurar los endpoints, los Directores de Seguridad (CISO) utilizan el **Quantum Engine 3D** desde pantallas de control para tener una consciencia situacional sin precedentes de las amenazas y bloqueos, convirtiendo datos aburridos en inteligencia de ciberseguridad premium.
+Mientras el Ingeniero de Redes utiliza la eficiencia de Q-Balam para asegurar los endpoints, los Directores de Seguridad (CISO) utilizan el **Quantum Engine 3D** desde pantallas de control para tener una consciencia situacional sin precedentes de las amenazas y bloqueos, convirtiendo datos aburridos en inteligencia de ciberseguridad premium.
 
 * ✉️ **Contacto Directo / Enterprise:** mmrobeerto@gmail.com
-* 📖 **Ingeniería detrás de Q-Guard:** [Deep-dive case study](https://dev.to/mmrobeertoops/how-we-built-an-ultra-low-latency-security-proxy-in-rust-python-2pan)
+* 📖 **Ingeniería detrás de Q-Balam:** [Deep-dive case study](https://dev.to/mmrobeertoops/how-we-built-an-ultra-low-latency-security-proxy-in-rust-python-2pan)
