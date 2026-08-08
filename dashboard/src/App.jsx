@@ -518,23 +518,32 @@ function App() {
           </div>
 
           {/* CENTER ACTIONS (GATES) */}
-          <div className="center-actions gates-panel">
-             {mode === 'PROD' && (
-                <input 
-                  className="ws-input" 
-                  value={wsUrl} 
-                  onChange={(e) => setWsUrl(e.target.value)} 
-                  placeholder="ws://localhost:8081"
-                />
-             )}
-             
-             <button 
-               className={`action-btn stress-btn ${!activeGate ? 'pulse-cyan' : 'disabled'}`} 
-               onClick={executeGate1}
-               disabled={!!activeGate}
-             >
-               [ GATE 1: STRESS TEST ]
-             </button>
+          <div className="center-actions">
+            
+             <div className="simulation-controls">
+               {mode === 'PROD' && (
+                  <input 
+                    className="ws-input" 
+                    value={wsUrl} 
+                    onChange={(e) => setWsUrl(e.target.value)} 
+                    placeholder="ws://localhost:8081"
+                  />
+               )}
+               {mode === 'DEMO' && (
+                  <button className="action-btn demo-toggle-btn" onClick={() => setDemoRunning(!demoRunning)}>
+                    {demoRunning ? '[ PAUSAR SIMULACIÓN ]' : '[ INICIAR SIMULACIÓN ]'}
+                  </button>
+               )}
+             </div>
+
+             <div className="gates-panel">
+               <button 
+                 className={`action-btn stress-btn ${!activeGate ? 'pulse-cyan' : 'disabled'}`} 
+                 onClick={executeGate1}
+                 disabled={!!activeGate}
+               >
+                 [ GATE 1: STRESS TEST ]
+               </button>
 
              <button 
                className={`action-btn alert-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
