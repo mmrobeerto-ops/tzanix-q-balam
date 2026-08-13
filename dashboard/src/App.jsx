@@ -147,6 +147,12 @@ function App() {
   };
 
 
+  // Referencias para leer el estado dentro del loop de animación sin reiniciar Three.js
+  const engineState = useRef({ activeGate: null, demoRunning: false });
+  useEffect(() => {
+    engineState.current = { activeGate, demoRunning };
+  }, [activeGate, demoRunning]);
+
   // --- INICIALIZACIÓN 3D ---
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -171,7 +177,6 @@ function App() {
 
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
-    // Reducimos drásticamente el bloom para evitar que se vea como un foco macizo
     bloomPass.strength = 0.6;
     bloomPass.radius = 0.5;
     bloomPass.threshold = 0.2;
@@ -186,7 +191,7 @@ function App() {
     scene.add(holographyGroup);
 
     // 1. SISTEMA DE NODOS Y TARGET MORPHING
-    const nodesCount = 1000; // Máxima densidad solicitada
+    const nodesCount = 1300; // Ultra Densidad
     const nodeGeo = new THREE.BufferGeometry();
     const currentPositions = new Float32Array(nodesCount * 3);
     
@@ -194,7 +199,7 @@ function App() {
     const velocities = [];
     const originalTargets = []; 
 
-    // FORMAR LA FIGURA MÁS AMPLIA
+    // FORMAR LA FIGURA
     for(let i = 0; i < nodesCount; i++) {
         currentPositions[i*3] = (Math.random() - 0.5) * 40;
         currentPositions[i*3+1] = (Math.random() - 0.5) * 40;
@@ -228,12 +233,12 @@ function App() {
     holographyGroup.add(nodesMesh);
     pointsRef.current = nodesMesh;
 
-    // 2. SHADER MATERIAL (Pulsos tipo "Flujo de Datos")
+    // 2. SHADER MATERIAL (Pulsos)
     const lineVertexShader = `
       uniform float uTime;
       varying float vAlpha;
       void main() {
-        float wave = sin(position.y * 3.0 - uTime * 15.0); // Pulsos rápidos
+        float wave = sin(position.y * 3.0 - uTime * 15.0); 
         vAlpha = smoothstep(0.7, 1.0, wave); 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
@@ -248,9 +253,9 @@ function App() {
       }
     `;
 
-    // 3. LÍNEAS (THRESHOLD RENDERING)
+    // 3. LÍNEAS 
     const linesGeo = new THREE.BufferGeometry();
-    const maxConnections = nodesCount * 8; // Memoria reservada
+    const maxConnections = nodesCount * 8; 
     const linesPos = new Float32Array(maxConnections * 3); 
     linesGeo.setAttribute('position', new THREE.BufferAttribute(linesPos, 3));
     
@@ -273,43 +278,46 @@ function App() {
 
     let animationFrameId;
     let clock = new THREE.Clock();
-    const THRESHOLD_SQ = 4.5; // Umbral ajustado para altísima densidad
+    const THRESHOLD_SQ = 3.5; // Muy bajo para alta densidad sin quemar la GPU
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
-      const gate = activeGate;
+      
+      const gate = engineState.current.activeGate;
+      const isDemoRunning = engineState.current.demoRunning;
 
       controls.update();
 
       if (pointsRef.current) {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
         
-        // Rotación inercial base
-        holographyGroup.rotation.y += 0.001;
+        // Rotación inercial súper sutil
+        holographyGroup.rotation.y += 0.0005;
         
-        let isSimulating = (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL');
+        // El movimiento debe ocurrir si hay demo corriendo o si hay ataque
+        let hasTraffic = isDemoRunning || gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL';
 
-        if (isSimulating) {
-            linesUniforms.uTime.value = elapsedTime; // Activar shaders
-            holographyGroup.rotation.z += 0.005; // Rotación extra por carga de trabajo
-            holographyGroup.rotation.x = Math.sin(elapsedTime) * 0.1;
+        if (hasTraffic) {
+            linesUniforms.uTime.value = elapsedTime; // Activa los pulsos de datos
+            holographyGroup.rotation.z += 0.003; 
+            holographyGroup.rotation.x = Math.sin(elapsedTime * 0.5) * 0.05;
         } else {
-            linesUniforms.uTime.value = 0.0; // Shader pausado
+            linesUniforms.uTime.value = 0.0; 
         }
 
         let targetColor = new THREE.Color(0x00f0ff);
         let turbulence = 0.0; 
         
-        if (!isSimulating || gate === 'GATE2_RESTORE') {
-            targetColor.setHex(0x00f0ff);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.6, 0.05);
-            linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 1.0, 0.1);
-        } else {
+        if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
             targetColor.setHex(0xff2e63);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.8, 0.1);
             linesUniforms.uGlobalAlpha.value = 1.0;
             turbulence = (gate === 'GATE2_ATTACK') ? 0.3 : 0.1;
+        } else {
+            targetColor.setHex(0x00f0ff);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.6, 0.05);
+            linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 1.0, 0.1);
         }
         
         nodesMesh.material.color.lerp(targetColor, 0.1);
@@ -327,28 +335,30 @@ function App() {
             const target = targets[i];
             const orig = originalTargets[i];
             
-            if (isSimulating) {
-               // Simulación corriendo: Flujo de datos orbital + Turbulencia
-               const currentTheta = orig.theta + elapsedTime * 1.5; // Rotación rápida
+            if (hasTraffic) {
+               // Simulación de Tráfico (Información entrando): Flujo orbital fluido
+               const currentTheta = orig.theta + elapsedTime * (gate ? 1.5 : 0.8); // Más rápido si es ataque
                const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
                const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
                const tz = orig.radius * Math.cos(orig.phi);
                
-               // Respiración (procesamiento de datos)
-               const breathe = Math.sin(elapsedTime * 8.0 + i) * 0.5;
+               // Respiración normal de procesamiento
+               const breathe = Math.sin(elapsedTime * 4.0 + i) * (gate ? 0.5 : 0.2);
                
-               // Ruido / Turbulencia del ataque
-               const noiseX = Math.sin(py * 5.0 + elapsedTime * 10.0) * turbulence;
-               const noiseY = Math.cos(pz * 5.0 + elapsedTime * 10.0) * turbulence;
-               const noiseZ = Math.sin(px * 5.0 - elapsedTime * 10.0) * turbulence;
+               // Turbulencia sólo durante ataques
+               let noiseX = 0, noiseY = 0, noiseZ = 0;
+               if (turbulence > 0) {
+                   noiseX = Math.sin(py * 5.0 + elapsedTime * 10.0) * turbulence;
+                   noiseY = Math.cos(pz * 5.0 + elapsedTime * 10.0) * turbulence;
+                   noiseZ = Math.sin(px * 5.0 - elapsedTime * 10.0) * turbulence;
+               }
 
                target.set(tx + noiseX, ty + breathe + noiseY, tz + noiseZ);
             } else {
-               // Reposo absoluto: Posición original estricta
+               // Totalmente congelado cuando la simulación de tráfico está apagada
                target.set(orig.vec.x, orig.vec.y, orig.vec.z);
             }
 
-            // Lerp físico
             posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.1);
             posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.1);
             posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.1);
@@ -403,7 +413,7 @@ function App() {
       renderer.dispose();
       scene.clear();
     };
-  }, [activeGate]); 
+  }, []); 
 
   const renderEntropyGraph = () => {
     const width = 300;
