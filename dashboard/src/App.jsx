@@ -186,7 +186,7 @@ function App() {
     scene.add(holographyGroup);
 
     // 1. SISTEMA DE NODOS Y TARGET MORPHING
-    const nodesCount = 650; // Aumento masivo de nodos
+    const nodesCount = 1000; // Máxima densidad solicitada
     const nodeGeo = new THREE.BufferGeometry();
     const currentPositions = new Float32Array(nodesCount * 3);
     
@@ -233,7 +233,7 @@ function App() {
       uniform float uTime;
       varying float vAlpha;
       void main() {
-        float wave = sin(position.y * 3.0 - uTime * 10.0);
+        float wave = sin(position.y * 3.0 - uTime * 15.0); // Pulsos rápidos
         vAlpha = smoothstep(0.7, 1.0, wave); 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
@@ -273,7 +273,7 @@ function App() {
 
     let animationFrameId;
     let clock = new THREE.Clock();
-    const THRESHOLD_SQ = 6.0; // Umbral ajustado para alta densidad
+    const THRESHOLD_SQ = 4.5; // Umbral ajustado para altísima densidad
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -285,34 +285,31 @@ function App() {
       if (pointsRef.current) {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
         
-        // Rotación general inercial estática y lenta (Reposo)
+        // Rotación inercial base
         holographyGroup.rotation.y += 0.001;
         
-        // El pulso de datos (shader) y rotación agresiva solo corre cuando entra información
-        if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
-            linesUniforms.uTime.value = elapsedTime;
-            holographyGroup.rotation.z = Math.sin(elapsedTime * 0.05) * 0.1;
+        let isSimulating = (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL');
+
+        if (isSimulating) {
+            linesUniforms.uTime.value = elapsedTime; // Activar shaders
+            holographyGroup.rotation.z += 0.005; // Rotación extra por carga de trabajo
+            holographyGroup.rotation.x = Math.sin(elapsedTime) * 0.1;
         } else {
-            linesUniforms.uTime.value = 0.0; // Detiene el pulso de los datos si no hay simulación
+            linesUniforms.uTime.value = 0.0; // Shader pausado
         }
 
         let targetColor = new THREE.Color(0x00f0ff);
-        let chaosForce = 0.0; 
+        let turbulence = 0.0; 
         
-        if (!gate || gate === 'GATE2_RESTORE') {
+        if (!isSimulating || gate === 'GATE2_RESTORE') {
             targetColor.setHex(0x00f0ff);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.6, 0.05);
             linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 1.0, 0.1);
-            chaosForce = 0.0; 
-        } else if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
+        } else {
             targetColor.setHex(0xff2e63);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.5, 0.1);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.8, 0.1);
             linesUniforms.uGlobalAlpha.value = 1.0;
-            chaosForce = (gate === 'GATE2_ATTACK') ? 0.4 : 0.05; 
-            
-            if (gate === 'GATE2_ATTACK') {
-                holographyGroup.rotation.y += (Math.random() - 0.5) * 0.05; 
-            }
+            turbulence = (gate === 'GATE2_ATTACK') ? 0.3 : 0.1;
         }
         
         nodesMesh.material.color.lerp(targetColor, 0.1);
@@ -330,32 +327,33 @@ function App() {
             const target = targets[i];
             const orig = originalTargets[i];
             
-            if (chaosForce > 0) {
-               // Ataque / Simulación corriendo: Inyectar entropía masiva y movimiento rápido
-               const noiseX = Math.sin(py * 3.0 + elapsedTime * 15.0) * chaosForce;
-               const noiseY = Math.cos(pz * 3.0 + elapsedTime * 15.0) * chaosForce;
-               const noiseZ = Math.sin(px * 3.0 - elapsedTime * 15.0) * chaosForce;
+            if (isSimulating) {
+               // Simulación corriendo: Flujo de datos orbital + Turbulencia
+               const currentTheta = orig.theta + elapsedTime * 1.5; // Rotación rápida
+               const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
+               const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
+               const tz = orig.radius * Math.cos(orig.phi);
                
-               velocities[i].x += noiseX;
-               velocities[i].y += noiseY;
-               velocities[i].z += noiseZ;
+               // Respiración (procesamiento de datos)
+               const breathe = Math.sin(elapsedTime * 8.0 + i) * 0.5;
                
-               velocities[i].multiplyScalar(0.9);
-               
-               target.x += velocities[i].x;
-               target.y += velocities[i].y;
-               target.z += velocities[i].z;
+               // Ruido / Turbulencia del ataque
+               const noiseX = Math.sin(py * 5.0 + elapsedTime * 10.0) * turbulence;
+               const noiseY = Math.cos(pz * 5.0 + elapsedTime * 10.0) * turbulence;
+               const noiseZ = Math.sin(px * 5.0 - elapsedTime * 10.0) * turbulence;
+
+               target.set(tx + noiseX, ty + breathe + noiseY, tz + noiseZ);
             } else {
-               // Reposo (Sin simulación): Congelado en su estructura perfecta
+               // Reposo absoluto: Posición original estricta
                target.set(orig.vec.x, orig.vec.y, orig.vec.z);
             }
 
-            // Lerp de posición actual hacia target (para suavidad)
+            // Lerp físico
             posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.1);
             posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.1);
             posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.1);
             
-            // THRESHOLD RENDERING (REGLA DE PROXIMIDAD)
+            // THRESHOLD RENDERING
             for(let j = i + 1; j < nodesCount; j++) {
                 const jx = j * 3;
                 const dx = posAttr[ix] - posAttr[jx];
