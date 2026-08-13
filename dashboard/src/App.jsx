@@ -167,7 +167,7 @@ function App() {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.autoRotate = false; // Desactivado para rotación manual por componente
+    controls.autoRotate = false; 
 
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
@@ -179,36 +179,59 @@ function App() {
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // 1. Matriz Exterior (Nube de Partículas)
-    const particlesCount = 8000;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particlesCount * 3);
+    // 1. Matriz Exterior (Constelación de Nodos)
+    const nodesCount = 350;
+    const nodeGeo = new THREE.BufferGeometry();
+    const nodePos = new Float32Array(nodesCount * 3);
+    const nodeVel = [];
     
-    for(let i = 0; i < particlesCount; i++) {
-        const r = 6 * Math.cbrt(Math.random());
+    for(let i = 0; i < nodesCount; i++) {
+        const r = 6 + Math.random() * 4;
         const theta = Math.random() * 2 * Math.PI;
         const phi = Math.acos(2 * Math.random() - 1);
         
-        positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
-        positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-        positions[i*3+2] = r * Math.cos(phi);
+        nodePos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+        nodePos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+        nodePos[i*3+2] = r * Math.cos(phi);
+        
+        nodeVel.push(new THREE.Vector3(
+           (Math.random()-0.5)*1.5,
+           (Math.random()-0.5)*1.5,
+           (Math.random()-0.5)*1.5
+        ));
     }
 
-    originalPositionsRef.current = new Float32Array(positions);
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    originalPositionsRef.current = new Float32Array(nodePos);
+    nodeGeo.setAttribute('position', new THREE.BufferAttribute(nodePos, 3));
 
-    const material = new THREE.PointsMaterial({
-        size: 0.05,
+    const nodeMat = new THREE.PointsMaterial({
+        size: 0.15,
         color: 0x00f0ff,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
 
-    const particlesMesh = new THREE.Points(geometry, material);
+    const particlesMesh = new THREE.Points(nodeGeo, nodeMat);
     scene.add(particlesMesh);
     pointsRef.current = particlesMesh;
+    
+    // Líneas interconectando los nodos
+    const linesGeo = new THREE.BufferGeometry();
+    // Pre-alocar suficiente espacio para las conexiones
+    const maxConnections = nodesCount * nodesCount;
+    const linesPos = new Float32Array(maxConnections * 3); 
+    linesGeo.setAttribute('position', new THREE.BufferAttribute(linesPos, 3));
+    const linesMat = new THREE.LineBasicMaterial({
+       color: 0x00f0ff,
+       transparent: true,
+       opacity: 0.25,
+       blending: THREE.AdditiveBlending,
+       depthWrite: false
+    });
+    const linesMesh = new THREE.LineSegments(linesGeo, linesMat);
+    scene.add(linesMesh);
 
     // 2. Tesseract Core (Hipercubo 4D)
     const coreGeo = new THREE.IcosahedronGeometry(2, 1);
@@ -221,9 +244,8 @@ function App() {
     // 3. Lazos Estructurales (8 Ejes Core-Perímetro)
     const linksCount = 8;
     const linksGeo = new THREE.BufferGeometry();
-    const linksPos = new Float32Array(linksCount * 6);
+    const linksPosInner = new Float32Array(linksCount * 6);
     
-    // Puntos fijos para simular los 8 vértices principales
     const coreVertices = [
        new THREE.Vector3(1, 1, 1), new THREE.Vector3(1, 1, -1),
        new THREE.Vector3(1, -1, 1), new THREE.Vector3(1, -1, -1),
@@ -234,12 +256,12 @@ function App() {
     for(let i=0; i<linksCount; i++) {
         const d1 = coreVertices[i].clone().normalize().multiplyScalar(2);
         const d2 = coreVertices[i].clone().normalize().multiplyScalar(5.5);
-        linksPos[i*6] = d1.x; linksPos[i*6+1] = d1.y; linksPos[i*6+2] = d1.z;
-        linksPos[i*6+3] = d2.x; linksPos[i*6+4] = d2.y; linksPos[i*6+5] = d2.z;
+        linksPosInner[i*6] = d1.x; linksPosInner[i*6+1] = d1.y; linksPosInner[i*6+2] = d1.z;
+        linksPosInner[i*6+3] = d2.x; linksPosInner[i*6+4] = d2.y; linksPosInner[i*6+5] = d2.z;
     }
-    linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPos, 3));
-    const linksMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
-    const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMat);
+    linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPosInner, 3));
+    const linksMatInner = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
+    const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMatInner);
     scene.add(dataLinksMesh);
 
     // 4. Partículas en Tránsito (Inbound Flow)
@@ -295,8 +317,9 @@ function App() {
         if (gate !== 'GATE2_ATTACK' && gate !== 'GATE2_KILL') {
             coreRef.rotation.x += 0.01;
             coreRef.rotation.z += 0.015;
-            pointsRef.current.rotation.y -= 0.003; // Nube externa gira al revés
-            dataLinksMesh.rotation.y -= 0.003; 
+            pointsRef.current.rotation.y -= 0.001; 
+            linesMesh.rotation.y -= 0.001;
+            dataLinksMesh.rotation.y -= 0.001; 
         }
 
         // PULSO DE ENTROPÍA (Cada 2.5s)
@@ -307,7 +330,6 @@ function App() {
                lastPulseTime = elapsedTime;
            }
            pulseMesh.scale.addScalar(0.08);
-           // Cliping a 0 para evitar opacidad negativa (que renderiza negro)
            pulseMesh.material.opacity = Math.max(0, pulseMesh.material.opacity - 0.02);
         } else {
            pulseMesh.material.opacity = 0; // Ocultar durante ataque
@@ -315,11 +337,11 @@ function App() {
 
         // LAZOS DE DATOS DINÁMICOS
         if (gate === 'GATE2_ATTACK') {
-            linksMat.color.setHex(0xff2e63);
-            linksMat.opacity = Math.random() * 0.9 + 0.1;
+            linksMatInner.color.setHex(0xff2e63);
+            linksMatInner.opacity = Math.random() * 0.9 + 0.1;
         } else {
-            linksMat.color.setHex(0x10ff88); // Jade Brillante
-            linksMat.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.6; // Parpadeo más visible
+            linksMatInner.color.setHex(0x10ff88); // Jade Brillante
+            linksMatInner.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.6; // Parpadeo más visible
         }
 
         // TRÁNSITO INBOUND
@@ -341,70 +363,90 @@ function App() {
         inboundMesh.geometry.attributes.position.needsUpdate = true;
 
 
-        // ESTADO NORMAL (Red Turquesa)
+        // LÓGICA DE CONSTELACIÓN INTERCONECTADA (NODOS)
+        let nodeColor = new THREE.Color(0x00f0ff);
+        let stress = 0;
+        
         if (!gate || gate === 'GATE2_RESTORE') {
-            pointsRef.current.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
-            coreRef.material.color.lerp(new THREE.Color(0x00f0ff), 0.05);
+            nodeColor = new THREE.Color(0x00f0ff);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
-            
+            linesMat.opacity = 0.25;
+            stress = 0;
             if (!gate && vectorsGroup.children.length > 0) {
                vectorsGroup.clear();
                quarantineGroup.clear();
                localShockwave = null;
             }
-
-            for(let i = 0; i < particlesCount; i++) {
-                const ix = i * 3;
-                let px = originals[ix];
-                let py = originals[ix+1];
-                let pz = originals[ix+2];
-                const wave = Math.sin(elapsedTime * 2.0 + px * 0.5) * 0.1;
-                
-                posAttr[ix] = THREE.MathUtils.lerp(posAttr[ix], px, 0.1);
-                posAttr[ix+1] = THREE.MathUtils.lerp(posAttr[ix+1], py + wave, 0.1);
-                posAttr[ix+2] = THREE.MathUtils.lerp(posAttr[ix+2], pz, 0.1);
-            }
-        } 
-        // GATE 2: FASE ATAQUE
-        else if (gate === 'GATE2_ATTACK') {
-            pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
-            coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+        } else if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
+            nodeColor = new THREE.Color(0xff2e63);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
-
-            coreRef.rotation.y += (Math.random() - 0.5) * 0.2;
-            coreRef.rotation.x += (Math.random() - 0.5) * 0.2;
-            pointsRef.current.rotation.y += (Math.random() - 0.5) * 0.05; // Sacudida esférica
-
-            if (vectorsGroup.children.length === 0) {
-                for (let j = 0; j < 15; j++) {
-                    const lineGeo = new THREE.BufferGeometry();
-                    const lineMat = new THREE.LineBasicMaterial({ color: 0xff2e63, transparent: true, opacity: 0.8 });
-                    const start = new THREE.Vector3((Math.random()-0.5)*40, (Math.random()-0.5)*40, (Math.random()-0.5)*40);
-                    const end = new THREE.Vector3((Math.random()-0.5)*4, (Math.random()-0.5)*4, (Math.random()-0.5)*4);
-                    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...start.toArray(), ...end.toArray()]), 3));
-                    vectorsGroup.add(new THREE.Line(lineGeo, lineMat));
-                }
-            }
-
-            for(let i = 0; i < particlesCount; i++) {
-                const ix = i * 3;
-                let px = originals[ix];
-                let py = originals[ix+1];
-                let pz = originals[ix+2];
-                const noise = Math.sin(elapsedTime * 20.0 + px) * 0.8;
-                posAttr[ix] = px + noise * Math.random();
-                posAttr[ix+1] = py + noise * Math.random();
-                posAttr[ix+2] = pz + noise * Math.random();
+            linesMat.opacity = 0.5 + Math.sin(elapsedTime * 10)*0.3;
+            stress = (gate === 'GATE2_ATTACK') ? 0.6 : 0.05; 
+            
+            if (gate === 'GATE2_ATTACK') {
+                coreRef.rotation.y += (Math.random() - 0.5) * 0.2;
+                coreRef.rotation.x += (Math.random() - 0.5) * 0.2;
+                pointsRef.current.rotation.y += (Math.random() - 0.5) * 0.05; 
+                linesMesh.rotation.y += (Math.random() - 0.5) * 0.05; 
             }
         }
-        // GATE 2: FASE KILLSWITCH
-        else if (gate === 'GATE2_KILL') {
-            pointsRef.current.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
-            coreRef.material.color.lerp(new THREE.Color(0xff2e63), 0.1);
+        
+        pointsRef.current.material.color.lerp(nodeColor, 0.1);
+        linesMat.color.lerp(nodeColor, 0.1);
+        coreRef.material.color.lerp(nodeColor, 0.1);
+
+        let lineIndex = 0;
+        const linesArray = linesMesh.geometry.attributes.position.array;
+        
+        for(let i = 0; i < nodesCount; i++) {
+            const ix = i * 3;
+            let px = posAttr[ix];
+            let py = posAttr[ix+1];
+            let pz = posAttr[ix+2];
             
-            // Frenado Inercial
+            // Movimiento suave orgánico tipo célula
+            let targetX = originals[ix] + nodeVel[i].x * Math.sin(elapsedTime + i);
+            let targetY = originals[ix+1] + nodeVel[i].y * Math.sin(elapsedTime*1.2 + i);
+            let targetZ = originals[ix+2] + nodeVel[i].z * Math.cos(elapsedTime + i);
+            
+            if (stress > 0) {
+               targetX += (Math.random() - 0.5) * stress;
+               targetY += (Math.random() - 0.5) * stress;
+               targetZ += (Math.random() - 0.5) * stress;
+            }
+
+            posAttr[ix] = THREE.MathUtils.lerp(px, targetX, 0.1);
+            posAttr[ix+1] = THREE.MathUtils.lerp(py, targetY, 0.1);
+            posAttr[ix+2] = THREE.MathUtils.lerp(pz, targetZ, 0.1);
+            
+            // Re-calcular conexiones de líneas basadas en proximidad
+            for(let j = i + 1; j < nodesCount; j++) {
+                const jx = j * 3;
+                const dx = posAttr[ix] - posAttr[jx];
+                const dy = posAttr[ix+1] - posAttr[jx+1];
+                const dz = posAttr[ix+2] - posAttr[jx+2];
+                const distSq = dx*dx + dy*dy + dz*dz;
+                
+                if (distSq < 7.5) { // Threshold de distancia
+                    linesArray[lineIndex++] = posAttr[ix];
+                    linesArray[lineIndex++] = posAttr[ix+1];
+                    linesArray[lineIndex++] = posAttr[ix+2];
+                    linesArray[lineIndex++] = posAttr[jx];
+                    linesArray[lineIndex++] = posAttr[jx+1];
+                    linesArray[lineIndex++] = posAttr[jx+2];
+                }
+            }
+        }
+        
+        linesMesh.geometry.setDrawRange(0, lineIndex / 3);
+        linesMesh.geometry.attributes.position.needsUpdate = true;
+        pointsRef.current.geometry.attributes.position.needsUpdate = true;
+
+        // GATE 2: FASE KILLSWITCH EFECTOS AISLADOS
+        if (gate === 'GATE2_KILL') {
             coreRef.rotation.x += 0.001; 
             pointsRef.current.rotation.y -= 0.0005;
+            linesMesh.rotation.y -= 0.0005;
 
             vectorsGroup.children.forEach(child => child.material.opacity -= 0.1);
 
@@ -429,8 +471,6 @@ function App() {
                 localShockwave.material.opacity -= 0.03;
             }
         }
-
-        pointsRef.current.geometry.attributes.position.needsUpdate = true;
       }
 
       composer.render();
@@ -451,6 +491,7 @@ function App() {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
+      scene.clear();
     };
   }, [activeGate]); 
 
