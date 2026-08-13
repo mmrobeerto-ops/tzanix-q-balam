@@ -167,7 +167,7 @@ function App() {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.autoRotate = false; 
+    controls.autoRotate = false;
 
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
@@ -179,128 +179,105 @@ function App() {
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // 1. Matriz Exterior (Constelación de Nodos)
-    const nodesCount = 350;
+    // ESCALA REDUCIDA: Todo el holograma estará contenido aquí
+    const holographyGroup = new THREE.Group();
+    holographyGroup.scale.set(0.5, 0.5, 0.5); // Escala menor solicitada
+    scene.add(holographyGroup);
+
+    // 1. SISTEMA DE NODOS Y TARGET MORPHING
+    const nodesCount = 400; // Nodos óptimos para rendimiento O(N^2) en cálculo de distancia
     const nodeGeo = new THREE.BufferGeometry();
-    const nodePos = new Float32Array(nodesCount * 3);
-    const nodeVel = [];
+    const currentPositions = new Float32Array(nodesCount * 3);
     
+    // Arrays lógicos
+    const targets = [];
+    const velocities = [];
+    const originalTargets = []; // Guarda la figura perfecta inmutable
+
+    // FORMAR LA FIGURA (Target Morphing Base: Doble Icosaedro / Esfera)
     for(let i = 0; i < nodesCount; i++) {
-        const r = 6 + Math.random() * 4;
+        // Coordenada inicial caótica (Empiezan dispersos)
+        currentPositions[i*3] = (Math.random() - 0.5) * 40;
+        currentPositions[i*3+1] = (Math.random() - 0.5) * 40;
+        currentPositions[i*3+2] = (Math.random() - 0.5) * 40;
+        
+        // Coordenada TARGET perfecta (Esfera geodésica concentrada)
+        // Dos capas: un núcleo denso y un anillo exterior
+        const radius = i % 2 === 0 ? 3.0 : 6.0; 
         const theta = Math.random() * 2 * Math.PI;
         const phi = Math.acos(2 * Math.random() - 1);
         
-        nodePos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-        nodePos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-        nodePos[i*3+2] = r * Math.cos(phi);
+        const tx = radius * Math.sin(phi) * Math.cos(theta);
+        const ty = radius * Math.sin(phi) * Math.sin(theta);
+        const tz = radius * Math.cos(phi);
         
-        nodeVel.push(new THREE.Vector3(
-           (Math.random()-0.5)*1.5,
-           (Math.random()-0.5)*1.5,
-           (Math.random()-0.5)*1.5
-        ));
+        const targetVec = new THREE.Vector3(tx, ty, tz);
+        targets.push(targetVec);
+        originalTargets.push(targetVec.clone());
+        
+        velocities.push(new THREE.Vector3(0,0,0));
     }
 
-    originalPositionsRef.current = new Float32Array(nodePos);
-    nodeGeo.setAttribute('position', new THREE.BufferAttribute(nodePos, 3));
-
+    nodeGeo.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
     const nodeMat = new THREE.PointsMaterial({
-        size: 0.15,
+        size: 0.25,
         color: 0x00f0ff,
         transparent: true,
-        opacity: 0.9,
+        opacity: 1.0,
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
+    const nodesMesh = new THREE.Points(nodeGeo, nodeMat);
+    holographyGroup.add(nodesMesh);
+    pointsRef.current = nodesMesh;
 
-    const particlesMesh = new THREE.Points(nodeGeo, nodeMat);
-    scene.add(particlesMesh);
-    pointsRef.current = particlesMesh;
-    
-    // Líneas interconectando los nodos
+    // 2. SHADER MATERIAL (Alpha Hacking para los hilos de luz)
+    const lineVertexShader = `
+      uniform float uTime;
+      varying float vAlpha;
+      void main() {
+        // El pulso viaja a través del espacio 3D a lo largo del tiempo
+        float wave = sin(position.x * 1.5 + position.y * 1.5 + position.z * 1.5 - uTime * 6.0);
+        vAlpha = wave * 0.5 + 0.5; // Normalizar entre 0 y 1
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+    const lineFragmentShader = `
+      uniform vec3 uColor;
+      uniform float uGlobalAlpha;
+      varying float vAlpha;
+      void main() {
+        gl_FragColor = vec4(uColor, vAlpha * uGlobalAlpha);
+      }
+    `;
+
+    // 3. LÍNEAS (THRESHOLD RENDERING)
     const linesGeo = new THREE.BufferGeometry();
-    // Pre-alocar suficiente espacio para las conexiones
-    const maxConnections = nodesCount * nodesCount;
+    const maxConnections = nodesCount * 15; // Allocation dinámica de memoria
     const linesPos = new Float32Array(maxConnections * 3); 
     linesGeo.setAttribute('position', new THREE.BufferAttribute(linesPos, 3));
-    const linesMat = new THREE.LineBasicMaterial({
-       color: 0x00f0ff,
-       transparent: true,
-       opacity: 0.25,
-       blending: THREE.AdditiveBlending,
-       depthWrite: false
+    
+    const linesUniforms = {
+       uTime: { value: 0.0 },
+       uColor: { value: new THREE.Color(0x00f0ff) },
+       uGlobalAlpha: { value: 0.6 }
+    };
+    
+    const linesMat = new THREE.ShaderMaterial({
+        uniforms: linesUniforms,
+        vertexShader: lineVertexShader,
+        fragmentShader: lineFragmentShader,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
     });
     const linesMesh = new THREE.LineSegments(linesGeo, linesMat);
-    scene.add(linesMesh);
+    holographyGroup.add(linesMesh);
 
-    // 2. Tesseract Core (Hipercubo 4D)
-    const coreGeo = new THREE.IcosahedronGeometry(2, 1);
-    const coreEdges = new THREE.EdgesGeometry(coreGeo);
-    const coreMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
-    const coreMesh = new THREE.LineSegments(coreEdges, coreMat);
-    scene.add(coreMesh);
-    const coreRef = coreMesh;
-
-    // 3. Lazos Estructurales (8 Ejes Core-Perímetro)
-    const linksCount = 8;
-    const linksGeo = new THREE.BufferGeometry();
-    const linksPosInner = new Float32Array(linksCount * 6);
-    
-    const coreVertices = [
-       new THREE.Vector3(1, 1, 1), new THREE.Vector3(1, 1, -1),
-       new THREE.Vector3(1, -1, 1), new THREE.Vector3(1, -1, -1),
-       new THREE.Vector3(-1, 1, 1), new THREE.Vector3(-1, 1, -1),
-       new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, -1, -1)
-    ];
-
-    for(let i=0; i<linksCount; i++) {
-        const d1 = coreVertices[i].clone().normalize().multiplyScalar(2);
-        const d2 = coreVertices[i].clone().normalize().multiplyScalar(5.5);
-        linksPosInner[i*6] = d1.x; linksPosInner[i*6+1] = d1.y; linksPosInner[i*6+2] = d1.z;
-        linksPosInner[i*6+3] = d2.x; linksPosInner[i*6+4] = d2.y; linksPosInner[i*6+5] = d2.z;
-    }
-    linksGeo.setAttribute('position', new THREE.BufferAttribute(linksPosInner, 3));
-    const linksMatInner = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
-    const dataLinksMesh = new THREE.LineSegments(linksGeo, linksMatInner);
-    scene.add(dataLinksMesh);
-
-    // 4. Partículas en Tránsito (Inbound Flow)
-    const inboundCount = 30;
-    const inboundGeo = new THREE.BufferGeometry();
-    const inboundPos = new Float32Array(inboundCount * 3);
-    const inboundDirs = [];
-    const inboundDistances = [];
-    
-    for(let i=0; i<inboundCount; i++) {
-        const dir = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
-        inboundDirs.push(dir);
-        inboundDistances.push(6 + Math.random() * 2); 
-    }
-    inboundGeo.setAttribute('position', new THREE.BufferAttribute(inboundPos, 3));
-    const inboundMat = new THREE.PointsMaterial({ size: 0.15, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-    const inboundMesh = new THREE.Points(inboundGeo, inboundMat);
-    scene.add(inboundMesh);
-
-    // 5. Pulso de Entropía (Heartbeat)
-    const pulseGeo = new THREE.TorusGeometry(1, 0.02, 16, 100);
-    const pulseMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
-    const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
-    pulseMesh.rotation.x = Math.PI / 2;
-    scene.add(pulseMesh);
-    let lastPulseTime = 0;
-
-
-    const vectorsGroup = new THREE.Group();
-    scene.add(vectorsGroup);
-    vectorsGroupRef.current = vectorsGroup;
-
-    const quarantineGroup = new THREE.Group();
-    scene.add(quarantineGroup);
-    quarantineGroupRef.current = quarantineGroup;
-
-    let localShockwave = null;
+    // Variables de control de renderizado
     let animationFrameId;
     let clock = new THREE.Clock();
+    const THRESHOLD_SQ = 9.0; // Distancia máxima al cuadrado (3.0 * 3.0)
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -311,90 +288,40 @@ function App() {
 
       if (pointsRef.current) {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
-        const originals = originalPositionsRef.current;
         
-        // EFECTO GIROSCOPIO 4D (Rotación Opuesta Constante)
-        if (gate !== 'GATE2_ATTACK' && gate !== 'GATE2_KILL') {
-            coreRef.rotation.x += 0.01;
-            coreRef.rotation.z += 0.015;
-            pointsRef.current.rotation.y -= 0.001; 
-            linesMesh.rotation.y -= 0.001;
-            dataLinksMesh.rotation.y -= 0.001; 
-        }
+        // Rotación general inercial de la holografía
+        holographyGroup.rotation.y += 0.002;
+        holographyGroup.rotation.x = Math.sin(elapsedTime * 0.1) * 0.2;
 
-        // PULSO DE ENTROPÍA (Cada 2.5s)
-        if (!gate || gate === 'GATE2_RESTORE') {
-           if (elapsedTime - lastPulseTime > 2.5) {
-               pulseMesh.scale.set(0.1, 0.1, 0.1);
-               pulseMesh.material.opacity = 0.8;
-               lastPulseTime = elapsedTime;
-           }
-           pulseMesh.scale.addScalar(0.08);
-           pulseMesh.material.opacity = Math.max(0, pulseMesh.material.opacity - 0.02);
-        } else {
-           pulseMesh.material.opacity = 0; // Ocultar durante ataque
-        }
+        // Actualización de Shader (Pulsos)
+        linesUniforms.uTime.value = elapsedTime;
 
-        // LAZOS DE DATOS DINÁMICOS
-        if (gate === 'GATE2_ATTACK') {
-            linksMatInner.color.setHex(0xff2e63);
-            linksMatInner.opacity = Math.random() * 0.9 + 0.1;
-        } else {
-            linksMatInner.color.setHex(0x10ff88); // Jade Brillante
-            linksMatInner.opacity = (Math.sin(elapsedTime * 6) * 0.5 + 0.5) * 0.6; // Parpadeo más visible
-        }
-
-        // TRÁNSITO INBOUND
-        const inPos = inboundMesh.geometry.attributes.position.array;
-        let speed = 0.02;
-        if (gate === 'GATE2_ATTACK') { speed = 0.1; inboundMat.color.setHex(0xff2e63); }
-        else if (gate === 'GATE2_KILL') { speed = 0.0; inboundMat.opacity -= 0.05; }
-        else { speed = 0.02; inboundMat.color.setHex(0xffffff); inboundMat.opacity = 1; }
-
-        for(let i=0; i<inboundCount; i++) {
-            inboundDistances[i] -= speed;
-            if (inboundDistances[i] < 2) inboundDistances[i] = 6 + Math.random() * 2; // Reset al borde
-            const d = inboundDirs[i];
-            const dist = inboundDistances[i];
-            inPos[i*3] = d.x * dist;
-            inPos[i*3+1] = d.y * dist;
-            inPos[i*3+2] = d.z * dist;
-        }
-        inboundMesh.geometry.attributes.position.needsUpdate = true;
-
-
-        // LÓGICA DE CONSTELACIÓN INTERCONECTADA (NODOS)
-        let nodeColor = new THREE.Color(0x00f0ff);
-        let stress = 0;
+        // LÓGICA DE ESTADOS Y COLORES
+        let targetColor = new THREE.Color(0x00f0ff);
+        let chaosForce = 0.0; // Intensidad de la entropía (Viento Cuántico)
         
         if (!gate || gate === 'GATE2_RESTORE') {
-            nodeColor = new THREE.Color(0x00f0ff);
+            targetColor.setHex(0x00f0ff);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
-            linesMat.opacity = 0.25;
-            stress = 0;
-            if (!gate && vectorsGroup.children.length > 0) {
-               vectorsGroup.clear();
-               quarantineGroup.clear();
-               localShockwave = null;
-            }
+            linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 0.6, 0.1);
+            chaosForce = 0.0; 
         } else if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
-            nodeColor = new THREE.Color(0xff2e63);
+            targetColor.setHex(0xff2e63);
             bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
-            linesMat.opacity = 0.5 + Math.sin(elapsedTime * 10)*0.3;
-            stress = (gate === 'GATE2_ATTACK') ? 0.6 : 0.05; 
+            linesUniforms.uGlobalAlpha.value = 1.0;
+            // Si es ataque puro, mucha entropía. Si es kill-switch, frena un poco
+            chaosForce = (gate === 'GATE2_ATTACK') ? 0.3 : 0.05; 
             
+            // Sacudida holográfica extra
             if (gate === 'GATE2_ATTACK') {
-                coreRef.rotation.y += (Math.random() - 0.5) * 0.2;
-                coreRef.rotation.x += (Math.random() - 0.5) * 0.2;
-                pointsRef.current.rotation.y += (Math.random() - 0.5) * 0.05; 
-                linesMesh.rotation.y += (Math.random() - 0.5) * 0.05; 
+                holographyGroup.rotation.y += (Math.random() - 0.5) * 0.05; 
             }
         }
         
-        pointsRef.current.material.color.lerp(nodeColor, 0.1);
-        linesMat.color.lerp(nodeColor, 0.1);
-        coreRef.material.color.lerp(nodeColor, 0.1);
+        nodesMesh.material.color.lerp(targetColor, 0.1);
+        linesUniforms.uColor.value.lerp(targetColor, 0.1);
 
+        // MOTOR FÍSICO: LERP & ENTROPÍA
         let lineIndex = 0;
         const linesArray = linesMesh.geometry.attributes.position.array;
         
@@ -404,73 +331,66 @@ function App() {
             let py = posAttr[ix+1];
             let pz = posAttr[ix+2];
             
-            // Movimiento suave orgánico tipo célula
-            let targetX = originals[ix] + nodeVel[i].x * Math.sin(elapsedTime + i);
-            let targetY = originals[ix+1] + nodeVel[i].y * Math.sin(elapsedTime*1.2 + i);
-            let targetZ = originals[ix+2] + nodeVel[i].z * Math.cos(elapsedTime + i);
+            // Gravedad hacia la posición perfecta (Target Morphing)
+            const target = targets[i];
             
-            if (stress > 0) {
-               targetX += (Math.random() - 0.5) * stress;
-               targetY += (Math.random() - 0.5) * stress;
-               targetZ += (Math.random() - 0.5) * stress;
+            if (chaosForce > 0) {
+               // INYECCIÓN DE ENTROPÍA (Ruido simulado con senos/cosenos asíncronos)
+               const noiseX = Math.sin(py * 2.0 + elapsedTime * 10.0) * chaosForce;
+               const noiseY = Math.cos(pz * 2.0 + elapsedTime * 10.0) * chaosForce;
+               const noiseZ = Math.sin(px * 2.0 - elapsedTime * 10.0) * chaosForce;
+               
+               // La velocidad empuja el nodo lejos de su posición
+               velocities[i].x += noiseX;
+               velocities[i].y += noiseY;
+               velocities[i].z += noiseZ;
+               
+               // Amortiguación inercial (Fricción)
+               velocities[i].multiplyScalar(0.9);
+               
+               target.x += velocities[i].x;
+               target.y += velocities[i].y;
+               target.z += velocities[i].z;
+            } else {
+               // RETORNO AL ORDEN (LERP hacia las coordenadas originales)
+               target.lerp(originalTargets[i], 0.02);
             }
 
-            posAttr[ix] = THREE.MathUtils.lerp(px, targetX, 0.1);
-            posAttr[ix+1] = THREE.MathUtils.lerp(py, targetY, 0.1);
-            posAttr[ix+2] = THREE.MathUtils.lerp(pz, targetZ, 0.1);
+            // Aplicar movimiento físico hacia el target (LERP real del punto)
+            posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.05);
+            posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.05);
+            posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.05);
             
-            // Re-calcular conexiones de líneas basadas en proximidad
+            // THRESHOLD RENDERING (REGLA DE PROXIMIDAD)
             for(let j = i + 1; j < nodesCount; j++) {
+                // Optimización espacial simple
                 const jx = j * 3;
                 const dx = posAttr[ix] - posAttr[jx];
                 const dy = posAttr[ix+1] - posAttr[jx+1];
                 const dz = posAttr[ix+2] - posAttr[jx+2];
                 const distSq = dx*dx + dy*dy + dz*dz;
                 
-                if (distSq < 7.5) { // Threshold de distancia
-                    linesArray[lineIndex++] = posAttr[ix];
-                    linesArray[lineIndex++] = posAttr[ix+1];
-                    linesArray[lineIndex++] = posAttr[ix+2];
-                    linesArray[lineIndex++] = posAttr[jx];
-                    linesArray[lineIndex++] = posAttr[jx+1];
-                    linesArray[lineIndex++] = posAttr[jx+2];
+                if (distSq < THRESHOLD_SQ) {
+                    if (lineIndex < maxConnections * 3) {
+                        linesArray[lineIndex++] = posAttr[ix];
+                        linesArray[lineIndex++] = posAttr[ix+1];
+                        linesArray[lineIndex++] = posAttr[ix+2];
+                        linesArray[lineIndex++] = posAttr[jx];
+                        linesArray[lineIndex++] = posAttr[jx+1];
+                        linesArray[lineIndex++] = posAttr[jx+2];
+                    }
                 }
             }
+        }
+        
+        // Esconder las líneas sobrantes vaciando los vértices fuera de rango
+        for (let k = lineIndex; k < maxConnections * 3; k++) {
+            linesArray[k] = 0;
         }
         
         linesMesh.geometry.setDrawRange(0, lineIndex / 3);
         linesMesh.geometry.attributes.position.needsUpdate = true;
         pointsRef.current.geometry.attributes.position.needsUpdate = true;
-
-        // GATE 2: FASE KILLSWITCH EFECTOS AISLADOS
-        if (gate === 'GATE2_KILL') {
-            coreRef.rotation.x += 0.001; 
-            pointsRef.current.rotation.y -= 0.0005;
-            linesMesh.rotation.y -= 0.0005;
-
-            vectorsGroup.children.forEach(child => child.material.opacity -= 0.1);
-
-            if (quarantineGroup.children.length === 0) {
-                const ringGeo = new THREE.TorusGeometry(1, 0.05, 16, 100);
-                const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
-                localShockwave = new THREE.Mesh(ringGeo, ringMat);
-                localShockwave.rotation.x = Math.PI / 2;
-                quarantineGroup.add(localShockwave);
-
-                for(let k=0; k < 5; k++) {
-                    const cubeGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-                    const cubeMat = new THREE.MeshBasicMaterial({ color: 0xff2e63, wireframe: true, transparent: true, opacity: 0.9 });
-                    const cube = new THREE.Mesh(cubeGeo, cubeMat);
-                    cube.position.set((Math.random()-0.5)*6, (Math.random()-0.5)*6, (Math.random()-0.5)*6);
-                    quarantineGroup.add(cube);
-                }
-            }
-
-            if (localShockwave) {
-                localShockwave.scale.addScalar(0.5);
-                localShockwave.material.opacity -= 0.03;
-            }
-        }
       }
 
       composer.render();
