@@ -186,7 +186,7 @@ function App() {
     scene.add(holographyGroup);
 
     // 1. SISTEMA DE NODOS Y TARGET MORPHING
-    const nodesCount = 400; 
+    const nodesCount = 650; // Aumento masivo de nodos
     const nodeGeo = new THREE.BufferGeometry();
     const currentPositions = new Float32Array(nodesCount * 3);
     
@@ -194,13 +194,12 @@ function App() {
     const velocities = [];
     const originalTargets = []; 
 
-    // FORMAR LA FIGURA MÁS AMPLIA (Evitar aglomeración de luz)
+    // FORMAR LA FIGURA MÁS AMPLIA
     for(let i = 0; i < nodesCount; i++) {
         currentPositions[i*3] = (Math.random() - 0.5) * 40;
         currentPositions[i*3+1] = (Math.random() - 0.5) * 40;
         currentPositions[i*3+2] = (Math.random() - 0.5) * 40;
         
-        // Radios más amplios para crear una "malla" espaciada, no una bola sólida
         const radius = 6.0 + (Math.random() * 4.0); 
         const theta = Math.random() * 2 * Math.PI;
         const phi = Math.acos(2 * Math.random() - 1);
@@ -218,7 +217,7 @@ function App() {
 
     nodeGeo.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
     const nodeMat = new THREE.PointsMaterial({
-        size: 0.1, // Nodos más pequeños
+        size: 0.1,
         color: 0x00f0ff,
         transparent: true,
         opacity: 0.8,
@@ -234,10 +233,7 @@ function App() {
       uniform float uTime;
       varying float vAlpha;
       void main() {
-        // En lugar de una onda suave, hacemos pulsos "filosos" como paquetes de datos
-        // Usamos la posición world para hacer el barrido
         float wave = sin(position.y * 3.0 - uTime * 10.0);
-        // step(0.8, wave) hace que solo se vea la línea si la onda está en su pico más alto
         vAlpha = smoothstep(0.7, 1.0, wave); 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
@@ -247,7 +243,6 @@ function App() {
       uniform float uGlobalAlpha;
       varying float vAlpha;
       void main() {
-        // Damos una opacidad base muy baja (0.05) para la estructura, y brilla fuerte (vAlpha) cuando pasa el pulso de datos
         float finalAlpha = (0.05 + vAlpha * 0.8) * uGlobalAlpha;
         gl_FragColor = vec4(uColor, finalAlpha);
       }
@@ -255,7 +250,7 @@ function App() {
 
     // 3. LÍNEAS (THRESHOLD RENDERING)
     const linesGeo = new THREE.BufferGeometry();
-    const maxConnections = nodesCount * 10; 
+    const maxConnections = nodesCount * 8; // Memoria reservada
     const linesPos = new Float32Array(maxConnections * 3); 
     linesGeo.setAttribute('position', new THREE.BufferAttribute(linesPos, 3));
     
@@ -278,8 +273,7 @@ function App() {
 
     let animationFrameId;
     let clock = new THREE.Clock();
-    // Umbral estricto para que no se conecten todos con todos
-    const THRESHOLD_SQ = 6.5; 
+    const THRESHOLD_SQ = 6.0; // Umbral ajustado para alta densidad
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -291,12 +285,16 @@ function App() {
       if (pointsRef.current) {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
         
-        // Rotación general inercial de la holografía
-        holographyGroup.rotation.y += 0.002;
-        holographyGroup.rotation.z = Math.sin(elapsedTime * 0.05) * 0.1;
-
-        // Actualización de Shader
-        linesUniforms.uTime.value = elapsedTime;
+        // Rotación general inercial estática y lenta (Reposo)
+        holographyGroup.rotation.y += 0.001;
+        
+        // El pulso de datos (shader) y rotación agresiva solo corre cuando entra información
+        if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
+            linesUniforms.uTime.value = elapsedTime;
+            holographyGroup.rotation.z = Math.sin(elapsedTime * 0.05) * 0.1;
+        } else {
+            linesUniforms.uTime.value = 0.0; // Detiene el pulso de los datos si no hay simulación
+        }
 
         let targetColor = new THREE.Color(0x00f0ff);
         let chaosForce = 0.0; 
@@ -333,7 +331,7 @@ function App() {
             const orig = originalTargets[i];
             
             if (chaosForce > 0) {
-               // Ataque: Inyectar entropía
+               // Ataque / Simulación corriendo: Inyectar entropía masiva y movimiento rápido
                const noiseX = Math.sin(py * 3.0 + elapsedTime * 15.0) * chaosForce;
                const noiseY = Math.cos(pz * 3.0 + elapsedTime * 15.0) * chaosForce;
                const noiseZ = Math.sin(px * 3.0 - elapsedTime * 15.0) * chaosForce;
@@ -348,16 +346,8 @@ function App() {
                target.y += velocities[i].y;
                target.z += velocities[i].z;
             } else {
-               // Tráfico Normal: Simular flujo de recepción de información rotando los objetivos lentamente
-               const currentTheta = orig.theta + elapsedTime * 0.2;
-               const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
-               const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
-               const tz = orig.radius * Math.cos(orig.phi);
-               
-               // Pequeña oscilación rítmica (respiración del nodo)
-               const breathe = Math.sin(elapsedTime * 2.0 + i) * 0.2;
-               
-               target.set(tx, ty + breathe, tz);
+               // Reposo (Sin simulación): Congelado en su estructura perfecta
+               target.set(orig.vec.x, orig.vec.y, orig.vec.z);
             }
 
             // Lerp de posición actual hacia target (para suavidad)
