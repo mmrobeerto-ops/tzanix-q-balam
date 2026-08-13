@@ -287,22 +287,33 @@ function App() {
     const linesMesh = new THREE.LineSegments(linesGeo, linesMat);
     holographyGroup.add(linesMesh);
 
-    // 4. LÍNEAS INBOUND (HACIA EL NÚCLEO)
-    // Conectaremos el 15% de los nodos directamente al centro
-    const coreLinksCount = Math.floor(nodesCount * 0.15);
+    // 4. LÍNEAS INBOUND (SINAPSIS NEURONALES HACIA EL NÚCLEO)
+    const coreLinks = [];
+    for (let i = 0; i < nodesCount; i++) {
+        if (i % 7 === 0) { // Aproximadamente 15% de los nodos conectados
+            coreLinks.push({
+                nodeIndex: i,
+                offsets: [
+                    new THREE.Vector3((Math.random()-0.5)*3.0, (Math.random()-0.5)*3.0, (Math.random()-0.5)*3.0),
+                    new THREE.Vector3((Math.random()-0.5)*2.5, (Math.random()-0.5)*2.5, (Math.random()-0.5)*2.5),
+                    new THREE.Vector3((Math.random()-0.5)*1.5, (Math.random()-0.5)*1.5, (Math.random()-0.5)*1.5)
+                ]
+            });
+        }
+    }
+    
     const coreLinesGeo = new THREE.BufferGeometry();
-    const coreLinesPos = new Float32Array(coreLinksCount * 6); // 2 vértices por línea (nodo -> centro)
+    // 4 segmentos = 8 vértices = 24 floats por conexión
+    const coreLinesPos = new Float32Array(coreLinks.length * 8 * 3); 
     coreLinesGeo.setAttribute('position', new THREE.BufferAttribute(coreLinesPos, 3));
 
     const coreLineVertexShader = `
       uniform float uTime;
       varying float vAlpha;
       void main() {
-        // Distancia euclidiana al centro (0,0,0)
         float d = length(position);
-        // El pulso viaja desde la periferia hacia el centro a alta velocidad
         float wave = sin(d * 1.5 + uTime * 20.0);
-        vAlpha = smoothstep(0.8, 1.0, wave); 
+        vAlpha = smoothstep(0.7, 1.0, wave); 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
@@ -314,7 +325,7 @@ function App() {
     const coreLinesMat = new THREE.ShaderMaterial({
         uniforms: coreLinesUniforms,
         vertexShader: coreLineVertexShader,
-        fragmentShader: lineFragmentShader, // Reutilizamos el mismo fragment (brillo sobre 0.05 base)
+        fragmentShader: lineFragmentShader, 
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false
@@ -350,12 +361,12 @@ function App() {
 
         if (hasTraffic) {
             linesUniforms.uTime.value = elapsedTime; 
-            coreLinesUniforms.uTime.value = elapsedTime; // Activa los inyectores hacia el núcleo
+            coreLinesUniforms.uTime.value = elapsedTime; 
             
             holographyGroup.rotation.z += 0.003; 
             holographyGroup.rotation.x = Math.sin(elapsedTime * 0.5) * 0.05;
             
-            // Núcleo palpita recibiendo información
+            // Núcleo palpita
             const pulse = 1.0 + Math.sin(elapsedTime * 8.0) * 0.05;
             coreMesh.scale.set(pulse, pulse, pulse);
         } else {
@@ -375,7 +386,6 @@ function App() {
             turbulence = (gate === 'GATE2_ATTACK') ? 0.3 : 0.1;
             
             if (gate === 'GATE2_ATTACK') {
-                // Núcleo tiembla bajo ataque
                 coreMesh.scale.set(1.2 + Math.random()*0.1, 1.2 + Math.random()*0.1, 1.2 + Math.random()*0.1);
             }
         } else {
@@ -391,7 +401,6 @@ function App() {
         coreMesh.material.color.lerp(targetColor, 0.1);
 
         let lineIndex = 0;
-        let coreLineIndex = 0;
         const linesArray = linesMesh.geometry.attributes.position.array;
         const coreLinesArray = coreLinesMesh.geometry.attributes.position.array;
         
@@ -405,7 +414,6 @@ function App() {
             const orig = originalTargets[i];
             
             if (hasTraffic) {
-               // Simulación de Tráfico (Información entrando): Flujo orbital fluido
                const currentTheta = orig.theta + elapsedTime * (gate ? 1.5 : 0.8);
                const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
                const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
@@ -429,18 +437,6 @@ function App() {
             posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.1);
             posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.1);
             
-            // ACTUALIZAR CORE LINKS INBOUND (Conectar un subset de nodos directo al centro 0,0,0)
-            if (i % 7 === 0 && coreLineIndex < coreLinksCount * 6) {
-                // Vértice A (Nodo Periférico)
-                coreLinesArray[coreLineIndex++] = posAttr[ix];
-                coreLinesArray[coreLineIndex++] = posAttr[ix+1];
-                coreLinesArray[coreLineIndex++] = posAttr[ix+2];
-                // Vértice B (Centro Sólido del Núcleo)
-                coreLinesArray[coreLineIndex++] = 0;
-                coreLinesArray[coreLineIndex++] = 0;
-                coreLinesArray[coreLineIndex++] = 0;
-            }
-
             // THRESHOLD RENDERING (Conexiones Periféricas)
             for(let j = i + 1; j < nodesCount; j++) {
                 const jx = j * 3;
@@ -464,6 +460,50 @@ function App() {
         
         for (let k = lineIndex; k < maxConnections * 3; k++) {
             linesArray[k] = 0;
+        }
+        
+        // ACTUALIZAR CORE LINKS (Sinapsis)
+        let coreLineIndex = 0;
+        for (let k = 0; k < coreLinks.length; k++) {
+            const link = coreLinks[k];
+            const nx = posAttr[link.nodeIndex * 3];
+            const ny = posAttr[link.nodeIndex * 3 + 1];
+            const nz = posAttr[link.nodeIndex * 3 + 2];
+            
+            // Vibración orgánica de la sinapsis
+            const synapticTwitch = hasTraffic ? Math.sin(elapsedTime * 15.0 + k) * 0.15 : 0;
+            
+            const o0 = link.offsets[0];
+            const o1 = link.offsets[1];
+            const o2 = link.offsets[2];
+            
+            let p1x = nx * 0.75 + o0.x + synapticTwitch;
+            let p1y = ny * 0.75 + o0.y + synapticTwitch;
+            let p1z = nz * 0.75 + o0.z;
+            
+            let p2x = nx * 0.50 + o1.x - synapticTwitch;
+            let p2y = ny * 0.50 + o1.y + synapticTwitch;
+            let p2z = nz * 0.50 + o1.z;
+            
+            let p3x = nx * 0.25 + o2.x + synapticTwitch;
+            let p3y = ny * 0.25 + o2.y - synapticTwitch;
+            let p3z = nz * 0.25 + o2.z;
+            
+            // Seg 1 (Nodo a P1)
+            coreLinesArray[coreLineIndex++] = nx; coreLinesArray[coreLineIndex++] = ny; coreLinesArray[coreLineIndex++] = nz;
+            coreLinesArray[coreLineIndex++] = p1x; coreLinesArray[coreLineIndex++] = p1y; coreLinesArray[coreLineIndex++] = p1z;
+            
+            // Seg 2 (P1 a P2)
+            coreLinesArray[coreLineIndex++] = p1x; coreLinesArray[coreLineIndex++] = p1y; coreLinesArray[coreLineIndex++] = p1z;
+            coreLinesArray[coreLineIndex++] = p2x; coreLinesArray[coreLineIndex++] = p2y; coreLinesArray[coreLineIndex++] = p2z;
+            
+            // Seg 3 (P2 a P3)
+            coreLinesArray[coreLineIndex++] = p2x; coreLinesArray[coreLineIndex++] = p2y; coreLinesArray[coreLineIndex++] = p2z;
+            coreLinesArray[coreLineIndex++] = p3x; coreLinesArray[coreLineIndex++] = p3y; coreLinesArray[coreLineIndex++] = p3z;
+            
+            // Seg 4 (P3 al Centro)
+            coreLinesArray[coreLineIndex++] = p3x; coreLinesArray[coreLineIndex++] = p3y; coreLinesArray[coreLineIndex++] = p3z;
+            coreLinesArray[coreLineIndex++] = 0; coreLinesArray[coreLineIndex++] = 0; coreLinesArray[coreLineIndex++] = 0;
         }
         
         linesMesh.geometry.setDrawRange(0, lineIndex / 3);
