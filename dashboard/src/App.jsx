@@ -171,39 +171,37 @@ function App() {
 
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1);
-    bloomPass.strength = 1.2;
+    // Reducimos drásticamente el bloom para evitar que se vea como un foco macizo
+    bloomPass.strength = 0.6;
     bloomPass.radius = 0.5;
-    bloomPass.threshold = 0.1;
+    bloomPass.threshold = 0.2;
 
     const composer = new EffectComposer(renderer);
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // ESCALA REDUCIDA: Todo el holograma estará contenido aquí
+    // ESCALA REDUCIDA
     const holographyGroup = new THREE.Group();
-    holographyGroup.scale.set(0.5, 0.5, 0.5); // Escala menor solicitada
+    holographyGroup.scale.set(0.6, 0.6, 0.6); 
     scene.add(holographyGroup);
 
     // 1. SISTEMA DE NODOS Y TARGET MORPHING
-    const nodesCount = 400; // Nodos óptimos para rendimiento O(N^2) en cálculo de distancia
+    const nodesCount = 400; 
     const nodeGeo = new THREE.BufferGeometry();
     const currentPositions = new Float32Array(nodesCount * 3);
     
-    // Arrays lógicos
     const targets = [];
     const velocities = [];
-    const originalTargets = []; // Guarda la figura perfecta inmutable
+    const originalTargets = []; 
 
-    // FORMAR LA FIGURA (Target Morphing Base: Doble Icosaedro / Esfera)
+    // FORMAR LA FIGURA MÁS AMPLIA (Evitar aglomeración de luz)
     for(let i = 0; i < nodesCount; i++) {
-        // Coordenada inicial caótica (Empiezan dispersos)
         currentPositions[i*3] = (Math.random() - 0.5) * 40;
         currentPositions[i*3+1] = (Math.random() - 0.5) * 40;
         currentPositions[i*3+2] = (Math.random() - 0.5) * 40;
         
-        // Coordenada TARGET perfecta (Esfera geodésica concentrada)
-        // Dos capas: un núcleo denso y un anillo exterior
-        const radius = i % 2 === 0 ? 3.0 : 6.0; 
+        // Radios más amplios para crear una "malla" espaciada, no una bola sólida
+        const radius = 6.0 + (Math.random() * 4.0); 
         const theta = Math.random() * 2 * Math.PI;
         const phi = Math.acos(2 * Math.random() - 1);
         
@@ -213,17 +211,17 @@ function App() {
         
         const targetVec = new THREE.Vector3(tx, ty, tz);
         targets.push(targetVec);
-        originalTargets.push(targetVec.clone());
+        originalTargets.push({ vec: targetVec.clone(), theta, phi, radius });
         
         velocities.push(new THREE.Vector3(0,0,0));
     }
 
     nodeGeo.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
     const nodeMat = new THREE.PointsMaterial({
-        size: 0.25,
+        size: 0.1, // Nodos más pequeños
         color: 0x00f0ff,
         transparent: true,
-        opacity: 1.0,
+        opacity: 0.8,
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
@@ -231,14 +229,16 @@ function App() {
     holographyGroup.add(nodesMesh);
     pointsRef.current = nodesMesh;
 
-    // 2. SHADER MATERIAL (Alpha Hacking para los hilos de luz)
+    // 2. SHADER MATERIAL (Pulsos tipo "Flujo de Datos")
     const lineVertexShader = `
       uniform float uTime;
       varying float vAlpha;
       void main() {
-        // El pulso viaja a través del espacio 3D a lo largo del tiempo
-        float wave = sin(position.x * 1.5 + position.y * 1.5 + position.z * 1.5 - uTime * 6.0);
-        vAlpha = wave * 0.5 + 0.5; // Normalizar entre 0 y 1
+        // En lugar de una onda suave, hacemos pulsos "filosos" como paquetes de datos
+        // Usamos la posición world para hacer el barrido
+        float wave = sin(position.y * 3.0 - uTime * 10.0);
+        // step(0.8, wave) hace que solo se vea la línea si la onda está en su pico más alto
+        vAlpha = smoothstep(0.7, 1.0, wave); 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `;
@@ -247,20 +247,22 @@ function App() {
       uniform float uGlobalAlpha;
       varying float vAlpha;
       void main() {
-        gl_FragColor = vec4(uColor, vAlpha * uGlobalAlpha);
+        // Damos una opacidad base muy baja (0.05) para la estructura, y brilla fuerte (vAlpha) cuando pasa el pulso de datos
+        float finalAlpha = (0.05 + vAlpha * 0.8) * uGlobalAlpha;
+        gl_FragColor = vec4(uColor, finalAlpha);
       }
     `;
 
     // 3. LÍNEAS (THRESHOLD RENDERING)
     const linesGeo = new THREE.BufferGeometry();
-    const maxConnections = nodesCount * 15; // Allocation dinámica de memoria
+    const maxConnections = nodesCount * 10; 
     const linesPos = new Float32Array(maxConnections * 3); 
     linesGeo.setAttribute('position', new THREE.BufferAttribute(linesPos, 3));
     
     const linesUniforms = {
        uTime: { value: 0.0 },
        uColor: { value: new THREE.Color(0x00f0ff) },
-       uGlobalAlpha: { value: 0.6 }
+       uGlobalAlpha: { value: 1.0 }
     };
     
     const linesMat = new THREE.ShaderMaterial({
@@ -274,10 +276,10 @@ function App() {
     const linesMesh = new THREE.LineSegments(linesGeo, linesMat);
     holographyGroup.add(linesMesh);
 
-    // Variables de control de renderizado
     let animationFrameId;
     let clock = new THREE.Clock();
-    const THRESHOLD_SQ = 9.0; // Distancia máxima al cuadrado (3.0 * 3.0)
+    // Umbral estricto para que no se conecten todos con todos
+    const THRESHOLD_SQ = 6.5; 
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -291,28 +293,25 @@ function App() {
         
         // Rotación general inercial de la holografía
         holographyGroup.rotation.y += 0.002;
-        holographyGroup.rotation.x = Math.sin(elapsedTime * 0.1) * 0.2;
+        holographyGroup.rotation.z = Math.sin(elapsedTime * 0.05) * 0.1;
 
-        // Actualización de Shader (Pulsos)
+        // Actualización de Shader
         linesUniforms.uTime.value = elapsedTime;
 
-        // LÓGICA DE ESTADOS Y COLORES
         let targetColor = new THREE.Color(0x00f0ff);
-        let chaosForce = 0.0; // Intensidad de la entropía (Viento Cuántico)
+        let chaosForce = 0.0; 
         
         if (!gate || gate === 'GATE2_RESTORE') {
             targetColor.setHex(0x00f0ff);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.2, 0.05);
-            linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 0.6, 0.1);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.6, 0.05);
+            linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 1.0, 0.1);
             chaosForce = 0.0; 
         } else if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
             targetColor.setHex(0xff2e63);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 2.5, 0.1);
+            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.5, 0.1);
             linesUniforms.uGlobalAlpha.value = 1.0;
-            // Si es ataque puro, mucha entropía. Si es kill-switch, frena un poco
-            chaosForce = (gate === 'GATE2_ATTACK') ? 0.3 : 0.05; 
+            chaosForce = (gate === 'GATE2_ATTACK') ? 0.4 : 0.05; 
             
-            // Sacudida holográfica extra
             if (gate === 'GATE2_ATTACK') {
                 holographyGroup.rotation.y += (Math.random() - 0.5) * 0.05; 
             }
@@ -321,7 +320,6 @@ function App() {
         nodesMesh.material.color.lerp(targetColor, 0.1);
         linesUniforms.uColor.value.lerp(targetColor, 0.1);
 
-        // MOTOR FÍSICO: LERP & ENTROPÍA
         let lineIndex = 0;
         const linesArray = linesMesh.geometry.attributes.position.array;
         
@@ -331,39 +329,44 @@ function App() {
             let py = posAttr[ix+1];
             let pz = posAttr[ix+2];
             
-            // Gravedad hacia la posición perfecta (Target Morphing)
             const target = targets[i];
+            const orig = originalTargets[i];
             
             if (chaosForce > 0) {
-               // INYECCIÓN DE ENTROPÍA (Ruido simulado con senos/cosenos asíncronos)
-               const noiseX = Math.sin(py * 2.0 + elapsedTime * 10.0) * chaosForce;
-               const noiseY = Math.cos(pz * 2.0 + elapsedTime * 10.0) * chaosForce;
-               const noiseZ = Math.sin(px * 2.0 - elapsedTime * 10.0) * chaosForce;
+               // Ataque: Inyectar entropía
+               const noiseX = Math.sin(py * 3.0 + elapsedTime * 15.0) * chaosForce;
+               const noiseY = Math.cos(pz * 3.0 + elapsedTime * 15.0) * chaosForce;
+               const noiseZ = Math.sin(px * 3.0 - elapsedTime * 15.0) * chaosForce;
                
-               // La velocidad empuja el nodo lejos de su posición
                velocities[i].x += noiseX;
                velocities[i].y += noiseY;
                velocities[i].z += noiseZ;
                
-               // Amortiguación inercial (Fricción)
                velocities[i].multiplyScalar(0.9);
                
                target.x += velocities[i].x;
                target.y += velocities[i].y;
                target.z += velocities[i].z;
             } else {
-               // RETORNO AL ORDEN (LERP hacia las coordenadas originales)
-               target.lerp(originalTargets[i], 0.02);
+               // Tráfico Normal: Simular flujo de recepción de información rotando los objetivos lentamente
+               const currentTheta = orig.theta + elapsedTime * 0.2;
+               const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
+               const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
+               const tz = orig.radius * Math.cos(orig.phi);
+               
+               // Pequeña oscilación rítmica (respiración del nodo)
+               const breathe = Math.sin(elapsedTime * 2.0 + i) * 0.2;
+               
+               target.set(tx, ty + breathe, tz);
             }
 
-            // Aplicar movimiento físico hacia el target (LERP real del punto)
-            posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.05);
-            posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.05);
-            posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.05);
+            // Lerp de posición actual hacia target (para suavidad)
+            posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.1);
+            posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.1);
+            posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.1);
             
             // THRESHOLD RENDERING (REGLA DE PROXIMIDAD)
             for(let j = i + 1; j < nodesCount; j++) {
-                // Optimización espacial simple
                 const jx = j * 3;
                 const dx = posAttr[ix] - posAttr[jx];
                 const dy = posAttr[ix+1] - posAttr[jx+1];
@@ -383,7 +386,6 @@ function App() {
             }
         }
         
-        // Esconder las líneas sobrantes vaciando los vértices fuera de rango
         for (let k = lineIndex; k < maxConnections * 3; k++) {
             linesArray[k] = 0;
         }
