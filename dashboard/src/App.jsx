@@ -1,5 +1,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
+
+const MatrixRain = () => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const chars = '01'.split('');
+    const fontSize = 14;
+    const columns = canvas.width / fontSize;
+    const drops = [];
+    for (let x = 0; x < columns; x++) drops[x] = 1;
+
+    const draw = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#FF0055'; // Rojo Matrix
+      ctx.font = fontSize + 'px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    };
+
+    const interval = setInterval(draw, 33);
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="matrix-canvas" />;
+};
+
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -22,6 +67,7 @@ function App() {
   const [mode, setMode] = useState('DEMO'); 
   const [demoRunning, setDemoRunning] = useState(false);
   const [wsUrl, setWsUrl] = useState('ws://localhost:8081');
+  const [viewMode, setViewMode] = useState('HOLOGRAPHIC'); // HOLOGRAPHIC | RAW_DATA
 
   const [entropyHistory, setEntropyHistory] = useState(Array(60).fill(0.12));
 
@@ -191,7 +237,7 @@ function App() {
     scene.add(holographyGroup);
 
     // 0. NÚCLEO CENTRAL SÓLIDO (Core)
-    const coreGeo = new THREE.IcosahedronGeometry(1.2, 2); // Esfera geodésica low-poly sólida
+    const coreGeo = new THREE.IcosahedronGeometry(0.3, 2); // Esfera geodésica low-poly sólida, escala 25%
     const coreMat = new THREE.MeshBasicMaterial({ 
         color: 0x00f0ff,
         transparent: true,
@@ -602,7 +648,8 @@ function App() {
 
   return (
     <div className="dashboard-container">
-      <canvas ref={canvasRef} className="three-canvas" />
+      <MatrixRain />
+      <canvas ref={canvasRef} className={`three-canvas ${viewMode === 'RAW_DATA' ? 'dimmed' : ''}`} />
 
       <div className="hud-overlay">
         
@@ -622,6 +669,9 @@ function App() {
           </div>
 
           <div className="controls">
+            <button className="mode-select" onClick={() => setViewMode(viewMode === 'HOLOGRAPHIC' ? 'RAW_DATA' : 'HOLOGRAPHIC')}>
+              {viewMode === 'HOLOGRAPHIC' ? '[ VISTA DATOS RAW ]' : '[ VISTA HOLOGRÁFICA ]'}
+            </button>
             <select className="mode-select" value={mode} onChange={(e) => setMode(e.target.value)}>
               <option value="DEMO">MODE: DEMO</option>
               <option value="PROD">MODE: LIVE WEBSOCKET</option>
@@ -629,78 +679,134 @@ function App() {
           </div>
         </header>
 
-        {/* MIDDLE SECTION - METRICS & ACTIONS */}
-        <div className="middle-section">
-          
-          {/* LEFT PANEL - METRICS */}
-          <div className="panel left-panel glass-panel">
-            <h3>Entropy Wave (ATR)</h3>
-            <div className="entropy-graph-container">
-              {renderEntropyGraph()}
-            </div>
-            <ul className="metrics-list">
-              <li>
-                <span className="label">- Frecuencia:</span>
-                <span className="val">{getFrequency()} Hz</span>
-              </li>
-              <li>
-                <span className="label">- Entropía:</span>
-                <span className="val">{isAlertState ? '0.98' : stats.globalEntropy.toFixed(2)}</span>
-              </li>
-              <li>
-                <span className="label">- Conexiones:</span>
-                <span className="val">{stats.activeConnections.toLocaleString()}</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* CENTER ACTIONS */}
-          <div className="center-actions">
-            <div className="toolbar-panel glass-panel">
-               {mode === 'PROD' && (
-                  <input 
-                    className="ws-input" 
-                    value={wsUrl} 
-                    onChange={(e) => setWsUrl(e.target.value)} 
-                    placeholder="ws://localhost:8081"
-                  />
-               )}
-               {mode === 'DEMO' && (
-                  <button className="toolbar-btn green-btn" onClick={() => setDemoRunning(!demoRunning)}>
-                    {demoRunning ? '⏸ PAUSAR SIMULACIÓN' : '▶ INICIAR SIMULACIÓN'}
-                  </button>
-               )}
-               
-               <div className="separator-v"></div>
-
-               <button 
-                 className={`toolbar-btn red-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
-                 onClick={() => executeGate2()}
-                 disabled={!!activeGate}
-               >
-                 {activeGate ? '🛡 SISTEMA EN RESPUESTA' : '⚠ SIMULAR ATAQUE'}
-               </button>
-            </div>
-          </div>
-          
-        </div>
-
-        {/* RIGHT PANEL - CONSOLE */}
-        <div className="panel right-panel glass-panel console-panel">
-          <div className="terminal">
-            {logs.map(log => {
-              const hasBracket = log.msg.startsWith('[');
-              const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
-              return (
-                <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
-                  <span className="time">{timeStr}</span>
-                  <span className="msg">{log.msg}</span>
+        {viewMode === 'HOLOGRAPHIC' ? (
+          <>
+            {/* MIDDLE SECTION - METRICS & ACTIONS */}
+            <div className="middle-section">
+              
+              {/* LEFT PANEL - METRICS */}
+              <div className="panel left-panel glass-panel">
+                <h3>Entropy Wave (ATR)</h3>
+                <div className="entropy-graph-container">
+                  {renderEntropyGraph()}
                 </div>
-              );
-            })}
-            {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">System initializing...</span></div>}
+                <ul className="metrics-list">
+                  <li>
+                    <span className="label">- Frecuencia:</span>
+                    <span className="val">{getFrequency()} Hz</span>
+                  </li>
+                  <li>
+                    <span className="label">- Entropía:</span>
+                    <span className="val">{isAlertState ? '0.98' : stats.globalEntropy.toFixed(2)}</span>
+                  </li>
+                  <li>
+                    <span className="label">- Conexiones:</span>
+                    <span className="val">{stats.activeConnections.toLocaleString()}</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* CENTER ACTIONS */}
+              <div className="center-actions">
+                <div className="toolbar-panel glass-panel">
+                  {mode === 'PROD' && (
+                      <input 
+                        className="ws-input" 
+                        value={wsUrl} 
+                        onChange={(e) => setWsUrl(e.target.value)} 
+                        placeholder="ws://localhost:8081"
+                      />
+                  )}
+                  {mode === 'DEMO' && (
+                      <button className="toolbar-btn green-btn" onClick={() => setDemoRunning(!demoRunning)}>
+                        {demoRunning ? '[ PAUSAR SIMULACIÓN ]' : '[ INICIAR SIMULACIÓN ]'}
+                      </button>
+                  )}
+                  
+                  <div className="separator-v"></div>
+
+                  <button 
+                    className={`toolbar-btn red-btn ${!activeGate ? 'pulse-red' : 'disabled'}`} 
+                    onClick={() => executeGate2()}
+                    disabled={!!activeGate}
+                  >
+                    {activeGate ? '[ SISTEMA EN RESPUESTA ]' : '[ SIMULAR ATAQUE ]'}
+                  </button>
+                </div>
+              </div>
+              
+            </div>
+
+            {/* RIGHT PANEL - CONSOLE */}
+            <div className="panel right-panel glass-panel console-panel">
+              <div className="terminal">
+                {logs.map(log => {
+                  const hasBracket = log.msg.startsWith('[');
+                  const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
+                  return (
+                    <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
+                      <span className="time">{timeStr}</span>
+                      <span className="msg">{log.msg}</span>
+                    </div>
+                  );
+                })}
+                {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">System initializing...</span></div>}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="raw-data-panel">
+            <div className="raw-panel-section">
+              <h2>&gt;_ Live Traffic Analysis</h2>
+              <div className="large-terminal terminal">
+                {logs.map(log => {
+                  const hasBracket = log.msg.startsWith('[');
+                  const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
+                  return (
+                    <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
+                      <span className="time">{timeStr}</span>
+                      <span className="msg">{log.msg}</span>
+                    </div>
+                  );
+                })}
+                {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">Awaiting proxy connection...</span></div>}
+              </div>
+            </div>
+
+            <div className="raw-panel-section">
+              <h2>&gt;_ Tactical Control</h2>
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ border: '1px solid #1A2333', padding: '1rem', background: '#000' }}>
+                  <h3 style={{ color: '#00E5FF', margin: '0 0 0.5rem 0', fontFamily: 'Barlow', fontSize: '1rem' }}>NETWORK STATUS</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#8B949E' }}>Active Nodes:</span>
+                    <span style={{ color: '#FFF' }}>{stats.activeConnections.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    <span style={{ color: '#8B949E' }}>Blocked IPs:</span>
+                    <span style={{ color: '#FF0055' }}>{stats.blockedIPs.size}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button 
+                    className="toolbar-btn red-btn" 
+                    style={{ width: '100%', border: '1px solid #FF0055', color: '#FF0055', background: 'transparent' }}
+                    onClick={() => executeGate2()}
+                  >
+                    [ ARMAR KILL-SWITCH ]
+                  </button>
+                  <button 
+                    className="toolbar-btn green-btn" 
+                    style={{ width: '100%', border: '1px solid #00FFA3', color: '#00FFA3', background: 'transparent' }}
+                  >
+                    [ PURGAR CONEXIONES MUERTAS ]
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

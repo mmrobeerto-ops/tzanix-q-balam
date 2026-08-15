@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
   font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
@@ -11,8 +11,20 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #05070A;
+  background-color: #000000;
   color: #8B949E;
+}
+
+/* Lluvia Matrix */
+.matrix-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  opacity: 0.1;
+  pointer-events: none;
 }
 
 /* 3D Canvas al fondo */
@@ -23,6 +35,11 @@ body {
   width: 100vw;
   height: 100vh;
   z-index: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.three-canvas.dimmed {
+  opacity: 0.15;
 }
 
 /* Capa táctica por encima */
@@ -54,12 +71,16 @@ body {
   align-items: center;
   padding: 0.8rem 2rem;
   width: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.3);
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 1.4rem;
-  color: #8B949E;
+  font-family: 'Barlow', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 2px;
 }
@@ -79,21 +100,20 @@ body {
   background: rgba(0, 229, 255, 0.1);
   color: #00E5FF;
   padding: 0.4rem 1.2rem;
-  border-radius: 20px;
+  border-radius: 0; /* Industrial, sin bordes redondeados */
   border: 1px solid rgba(0, 229, 255, 0.3);
   font-weight: bold;
 }
 
 .status-pill.alert {
-  background: rgba(255, 46, 99, 0.1);
-  color: #FF2E63;
-  border-color: rgba(255, 46, 99, 0.3);
+  background: rgba(255, 0, 85, 0.1);
+  color: #FF0055;
+  border-color: rgba(255, 0, 85, 0.3);
 }
 
 .led-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 8px currentColor;
   animation: blink 1.5s infinite;
@@ -119,17 +139,66 @@ body {
 }
 
 .mode-select, .ws-input {
-  background: #05070A;
+  background: #000000;
   color: #00E5FF;
   border: 1px solid #1A2333;
   padding: 0.5rem 1rem;
   font-family: inherit;
   font-size: 0.8rem;
   outline: none;
+  border-radius: 0;
 }
 
 .ws-input {
   width: 180px;
+}
+
+/* Vista Raw Data (Data Terminal) */
+.raw-data-panel {
+  position: absolute;
+  top: 5rem;
+  left: 2rem;
+  right: 2rem;
+  bottom: 5rem;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #00E5FF;
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.1);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: row;
+  padding: 1.5rem;
+  gap: 2rem;
+  pointer-events: auto;
+}
+
+.raw-panel-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0, 229, 255, 0.2);
+  padding-right: 2rem;
+}
+.raw-panel-section:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.raw-panel-section h2 {
+  font-family: 'Barlow', sans-serif;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-top: 0;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 0.5rem;
+}
+
+.large-terminal {
+  flex: 1;
+  overflow-y: auto;
+  background: #000000;
+  border: 1px solid #1A2333;
+  padding: 1rem;
 }
 
 /* Middle Section */
@@ -145,13 +214,16 @@ body {
 .left-panel {
   padding: 1.5rem;
   width: 320px;
+  background: #000000;
+  border: 1px solid rgba(0, 229, 255, 0.2);
 }
 
 .left-panel h3 {
   margin-top: 0;
   margin-bottom: 1rem;
-  font-size: 0.8rem;
-  color: #8B949E;
+  font-family: 'Barlow', sans-serif;
+  font-size: 1rem;
+  color: #FFFFFF;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -160,7 +232,7 @@ body {
 .entropy-graph-container {
   width: 100%;
   height: 80px;
-  background: #05070A;
+  background: #000000;
   border: 1px solid #1A2333;
   margin-bottom: 1rem;
 }
@@ -211,26 +283,25 @@ body {
   flex-direction: row;
   align-items: center;
   gap: 1rem;
-  background: rgba(10, 14, 23, 0.85);
-  border: 1px solid rgba(0, 229, 255, 0.2);
+  background: #000000;
+  border: 1px solid rgba(0, 229, 255, 0.3);
   padding: 0.6rem 1.2rem;
-  border-radius: 8px;
   pointer-events: auto;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.8);
 }
 
 .toolbar-btn {
   background: transparent;
-  font-family: inherit;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 0.8rem;
   font-weight: bold;
   letter-spacing: 1px;
   cursor: pointer;
   border: none;
   padding: 0.4rem 0.8rem;
-  border-radius: 4px;
   transition: all 0.2s;
   white-space: nowrap;
+  border-radius: 0;
 }
 
 .toolbar-btn.green-btn {
