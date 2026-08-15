@@ -65,7 +65,7 @@ function App() {
   });
 
   const [mode, setMode] = useState('DEMO'); 
-  const [demoRunning, setDemoRunning] = useState(false);
+  const [demoRunning, setDemoRunning] = useState(true); // Tráfico base siempre activo por defecto
   const [wsUrl, setWsUrl] = useState('ws://localhost:8081');
   const [viewMode, setViewMode] = useState('HOLOGRAPHIC'); // HOLOGRAPHIC | RAW_DATA
 
