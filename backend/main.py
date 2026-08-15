@@ -3,7 +3,7 @@ import asyncio
 import httpx
 import json
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
-from core.entropy import calculate_shannon_entropy
+from rust_engine import calculate_shannon_entropy
 from core.db import init_db, is_ip_blocked, block_ip, log_traffic
 from core.soc_logger import log_soc_event
 
