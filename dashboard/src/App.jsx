@@ -124,28 +124,33 @@ function App() {
     };
   }, [mode, wsUrl]);
 
+  const globalEntropyRef = useRef(0.12);
+
   // --- LATIDO CONSTANTE (SCROLL DE LA ONDA) ---
   useEffect(() => {
     let timeOffset = 0;
     const heartbeat = setInterval(() => {
       timeOffset += 0.1;
-      setStats(prev => {
-        // En DEMO con demoRunning, oscila. En PROD o DEMO pausado, decae suavemente hacia 0.12.
-        let targetEntropy = 0.12;
-        if (mode === 'DEMO' && demoRunning && !activeGate) {
-            targetEntropy = 0.12 + Math.sin(timeOffset) * 0.03 + (Math.random() * 0.02);
-        }
-        
-        let newEntropy = prev.globalEntropy;
-        if (newEntropy > targetEntropy && !activeGate) {
-            newEntropy = Math.max(targetEntropy, newEntropy - 0.05); // Decadencia suave
-        } else if (mode === 'DEMO' && demoRunning && !activeGate) {
-            newEntropy = targetEntropy;
-        }
-
-        setEntropyHistory(hist => [...hist.slice(1), newEntropy]);
-        return { ...prev, globalEntropy: newEntropy };
+      
+      let targetEntropy = 0.12;
+      if (mode === 'DEMO' && demoRunning && !activeGate) {
+          targetEntropy = 0.12 + Math.sin(timeOffset) * 0.03 + (Math.random() * 0.02);
+      }
+      
+      let currentVal = globalEntropyRef.current;
+      if (currentVal > targetEntropy && !activeGate) {
+          currentVal = Math.max(targetEntropy, currentVal - 0.05); // Decadencia suave
+      } else if (mode === 'DEMO' && demoRunning && !activeGate) {
+          currentVal = targetEntropy;
+      }
+      
+      globalEntropyRef.current = currentVal;
+      
+      setEntropyHistory(hist => {
+          const next = [...hist.slice(1), currentVal];
+          return next;
       });
+
     }, 50);
 
     return () => clearInterval(heartbeat);
@@ -157,6 +162,7 @@ function App() {
     let currentEntropy = Math.min(entropy_score / 8.0, 1.0);
     let connections = 10000 + Math.floor(Math.random() * 1000);
 
+    globalEntropyRef.current = currentEntropy;
     setStats(prev => ({ ...prev, globalEntropy: currentEntropy, activeConnections: connections }));
   };
 
@@ -166,13 +172,9 @@ function App() {
     setActiveGate('GATE2_ATTACK');
     
     const entropyPct = 0.98;
+    globalEntropyRef.current = entropyPct;
     setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
-    setEntropyHistory(prev => {
-       const newHist = [...prev];
-       newHist[newHist.length - 1] = entropyPct;
-       newHist[newHist.length - 2] = entropyPct - 0.1;
-       return newHist;
-    });
+    
     appendLog(`ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
 
     setTimeout(() => {
@@ -183,13 +185,14 @@ function App() {
         updated.add(ip);
         return { ...prev, blockedIPs: updated };
       });
-      setEntropyHistory(prev => [...prev.slice(1), entropyPct]); 
+      // Mantenemos la entropía alta un instante más
+      globalEntropyRef.current = entropyPct;
     }, 420);
 
     setTimeout(() => {
       setActiveGate('GATE2_RESTORE');
+      globalEntropyRef.current = 0.12;
       setStats(prev => ({ ...prev, globalEntropy: 0.12 }));
-      setEntropyHistory(prev => [...prev.slice(1), 0.12]);
       appendLog(`ESTADO: Red protegida. Pérdida de datos: 0.00%. Latencia Proxy: 0.38ms.`, 'INFO');
     }, 2500);
 
