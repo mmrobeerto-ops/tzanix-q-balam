@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  tzanix-proxy:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SECURITY_MODE=AUDIT
+      - TARGET_URL=http://tzanix-dashboard:80 # En este demo, el target es el dashboard mismo, pero en prod es la BD
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/core/tzanix.db:/app/core/tzanix.db
+    restart: unless-stopped
+
+  tzanix-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Generar fecha de construcción automática para la prueba de 33 días
+        - BUILD_DATE=$(date +%s)
+    ports:
+      - "80:80"
+    depends_on:
+      - tzanix-proxy
+    restart: unless-stopped
+
+  # Base de Datos de Prueba (Opcional, simulando el target real)
+  # db:
+  #   image: postgres:15
+  #   environment:
+  #     - POSTGRES_PASSWORD=qbalam_test
