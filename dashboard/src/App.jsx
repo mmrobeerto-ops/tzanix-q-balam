@@ -205,7 +205,7 @@ function App() {
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.fog = new THREE.FogExp2(0x05070a, 0.04);
+    scene.fog = new THREE.FogExp2(0x000000, 0.04);
 
     const camera = new THREE.PerspectiveCamera(50, canvasRef.current.clientWidth / canvasRef.current.clientHeight, 0.1, 100);
     camera.position.set(10, 5, 15);
@@ -214,7 +214,7 @@ function App() {
     const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: false, powerPreference: "high-performance" });
     renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setClearColor(0x05070a, 1);
+    renderer.setClearColor(0x000000, 1);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
