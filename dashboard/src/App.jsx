@@ -124,26 +124,31 @@ function App() {
     };
   }, [mode, wsUrl]);
 
-  // --- LÓGICA DE SIMULACIÓN (MODO DEMO) ---
+  // --- LATIDO CONSTANTE (SCROLL DE LA ONDA) ---
   useEffect(() => {
-    if (mode === 'DEMO' && demoRunning) {
-      if (!activeGate) {
-        appendLog('[3:25:20] ESTADO: Red protegida. Entropía de Shannon: 0.18 (Baja).', 'INFO');
-      }
-      
-      let timeOffset = 0;
-      demoIntervalRef.current = setInterval(() => {
-        timeOffset += 0.1;
-        const baseEntropy = 0.12 + Math.sin(timeOffset) * 0.03 + (Math.random() * 0.02);
-        handleTrafficFlow("192.168.x.x", baseEntropy * 8.0);
-      }, 50);
-    } else {
-      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
-    }
+    let timeOffset = 0;
+    const heartbeat = setInterval(() => {
+      timeOffset += 0.1;
+      setStats(prev => {
+        // En DEMO con demoRunning, oscila. En PROD o DEMO pausado, decae suavemente hacia 0.12.
+        let targetEntropy = 0.12;
+        if (mode === 'DEMO' && demoRunning && !activeGate) {
+            targetEntropy = 0.12 + Math.sin(timeOffset) * 0.03 + (Math.random() * 0.02);
+        }
+        
+        let newEntropy = prev.globalEntropy;
+        if (newEntropy > targetEntropy && !activeGate) {
+            newEntropy = Math.max(targetEntropy, newEntropy - 0.05); // Decadencia suave
+        } else if (mode === 'DEMO' && demoRunning && !activeGate) {
+            newEntropy = targetEntropy;
+        }
 
-    return () => {
-      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
-    };
+        setEntropyHistory(hist => [...hist.slice(1), newEntropy]);
+        return { ...prev, globalEntropy: newEntropy };
+      });
+    }, 50);
+
+    return () => clearInterval(heartbeat);
   }, [mode, demoRunning, activeGate]);
 
   const handleTrafficFlow = (source_ip, entropy_score) => {
@@ -153,7 +158,6 @@ function App() {
     let connections = 10000 + Math.floor(Math.random() * 1000);
 
     setStats(prev => ({ ...prev, globalEntropy: currentEntropy, activeConnections: connections }));
-    setEntropyHistory(prev => [...prev.slice(1), currentEntropy]);
   };
 
   // --- GATE 2: ENTROPY & EXFILTRATION (El Kill-Switch) ---
