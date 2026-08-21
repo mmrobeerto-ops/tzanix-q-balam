@@ -205,10 +205,10 @@ function App() {
 
 
   // Referencias para leer el estado dentro del loop de animación sin reiniciar Three.js
-  const engineState = useRef({ activeGate: null, demoRunning: false });
+  const engineState = useRef({ activeGate: null, demoRunning: false, globalEntropy: 0.12 });
   useEffect(() => {
-    engineState.current = { activeGate, demoRunning };
-  }, [activeGate, demoRunning]);
+    engineState.current = { activeGate, demoRunning, globalEntropy: stats.globalEntropy };
+  }, [activeGate, demoRunning, stats.globalEntropy]);
 
   // --- INICIALIZACIÓN 3D ---
   useEffect(() => {
@@ -392,62 +392,65 @@ function App() {
 
     let animationFrameId;
     let clock = new THREE.Clock();
+    let virtualTime = 0;
     const THRESHOLD_SQ = 3.5; 
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
       
       const gate = engineState.current.activeGate;
       const isDemoRunning = engineState.current.demoRunning;
+      const entropy = engineState.current.globalEntropy; // Rango 0.12 a 0.98
+
+      // Parámetros reactivos basados en la señal de entropía real
+      const speedMult = 0.6 + (entropy * 3.5); // Aceleración del flujo temporal virtual
+      const rotationSpeed = 0.0008 + (entropy * 0.015); // Velocidad de giro tridimensional
+      const turbulence = entropy > 0.4 ? (entropy * 0.35) : (entropy * 0.04); // Deformación del campo cuántico
+      const bloomStrength = 0.5 + (entropy * 1.5); // Glow e intensidad del bloom
+      const pulseSpeed = 4.0 + (entropy * 12.0); // Ritmo de pulsación del núcleo
+      const pulseAmplitude = 0.04 + (entropy * 0.10); // Tamaño del latido
+
+      const delta = clock.getDelta();
+      virtualTime += delta * speedMult;
 
       controls.update();
+
+      // Ajustar intensidad de brillo del bloom de forma reactiva
+      bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, bloomStrength, 0.1);
 
       if (pointsRef.current) {
         const posAttr = pointsRef.current.geometry.attributes.position.array;
         
-        // Rotación inercial súper sutil
-        holographyGroup.rotation.y += 0.0005;
+        // Rotación inercial impulsada por la entropía
+        holographyGroup.rotation.y += rotationSpeed * 0.3;
+        holographyGroup.rotation.z += rotationSpeed * 0.6;
         
-        // Animación del Núcleo Sólido
-        coreMesh.rotation.y -= 0.01;
-        coreMesh.rotation.x += 0.005;
+        // Animación del Núcleo Sólido (gira en sentido opuesto)
+        coreMesh.rotation.y -= rotationSpeed * 1.8;
+        coreMesh.rotation.x += rotationSpeed * 0.9;
         
-        // El movimiento debe ocurrir si hay demo corriendo o si hay ataque
-        let hasTraffic = isDemoRunning || gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL';
+        // Latido dinámico del núcleo central
+        const pulse = 1.0 + Math.sin(virtualTime * pulseSpeed) * pulseAmplitude;
+        coreMesh.scale.set(pulse, pulse, pulse);
 
-        if (hasTraffic) {
-            linesUniforms.uTime.value = elapsedTime; 
-            coreLinesUniforms.uTime.value = elapsedTime; 
-            
-            holographyGroup.rotation.z += 0.003; 
-            holographyGroup.rotation.x = Math.sin(elapsedTime * 0.5) * 0.05;
-            
-            // Núcleo palpita
-            const pulse = 1.0 + Math.sin(elapsedTime * 8.0) * 0.05;
-            coreMesh.scale.set(pulse, pulse, pulse);
-        } else {
-            linesUniforms.uTime.value = 0.0; 
-            coreLinesUniforms.uTime.value = 0.0;
-            coreMesh.scale.set(1.0, 1.0, 1.0);
-        }
+        // Pasar tiempo virtual a los shaders
+        linesUniforms.uTime.value = virtualTime; 
+        coreLinesUniforms.uTime.value = virtualTime; 
 
         let targetColor = new THREE.Color(0x00f0ff);
-        let turbulence = 0.0; 
+        let finalTurbulence = turbulence;
         
         if (gate === 'GATE2_ATTACK' || gate === 'GATE2_KILL') {
             targetColor.setHex(0xff2e63);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 1.8, 0.1);
             linesUniforms.uGlobalAlpha.value = 1.0;
             coreLinesUniforms.uGlobalAlpha.value = 1.0;
-            turbulence = (gate === 'GATE2_ATTACK') ? 0.3 : 0.1;
+            finalTurbulence = (gate === 'GATE2_ATTACK') ? 0.38 : 0.12;
             
             if (gate === 'GATE2_ATTACK') {
-                coreMesh.scale.set(1.2 + Math.random()*0.1, 1.2 + Math.random()*0.1, 1.2 + Math.random()*0.1);
+                coreMesh.scale.set(pulse * 1.3, pulse * 1.3, pulse * 1.3);
             }
         } else {
             targetColor.setHex(0x00f0ff);
-            bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, 0.6, 0.05);
             linesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(linesUniforms.uGlobalAlpha.value, 1.0, 0.1);
             coreLinesUniforms.uGlobalAlpha.value = THREE.MathUtils.lerp(coreLinesUniforms.uGlobalAlpha.value, 1.0, 0.1);
         }
@@ -470,31 +473,27 @@ function App() {
             const target = targets[i];
             const orig = originalTargets[i];
             
-            if (hasTraffic) {
-               const currentTheta = orig.theta + elapsedTime * (gate ? 1.5 : 0.8);
-               const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
-               const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
-               const tz = orig.radius * Math.cos(orig.phi);
-               
-               const breathe = Math.sin(elapsedTime * 4.0 + i) * (gate ? 0.5 : 0.2);
-               
-               let noiseX = 0, noiseY = 0, noiseZ = 0;
-               if (turbulence > 0) {
-                   noiseX = Math.sin(py * 5.0 + elapsedTime * 10.0) * turbulence;
-                   noiseY = Math.cos(pz * 5.0 + elapsedTime * 10.0) * turbulence;
-                   noiseZ = Math.sin(px * 5.0 - elapsedTime * 10.0) * turbulence;
-               }
+            // Movimiento orbital contínuo modulado
+            const currentTheta = orig.theta + virtualTime * 0.4;
+            const tx = orig.radius * Math.sin(orig.phi) * Math.cos(currentTheta);
+            const ty = orig.radius * Math.sin(orig.phi) * Math.sin(currentTheta);
+            const tz = orig.radius * Math.cos(orig.phi);
+            
+            // Respiración reactiva de los nodos
+            const breathe = Math.sin(virtualTime * 2.0 + i) * (0.12 + entropy * 0.60);
+            
+            // Deformación de turbulencia según la entropía
+            let noiseX = Math.sin(py * 4.0 + virtualTime * 8.0) * finalTurbulence;
+            let noiseY = Math.cos(pz * 4.0 + virtualTime * 8.0) * finalTurbulence;
+            let noiseZ = Math.sin(px * 4.0 - virtualTime * 8.0) * finalTurbulence;
 
-               target.set(tx + noiseX, ty + breathe + noiseY, tz + noiseZ);
-            } else {
-               target.set(orig.vec.x, orig.vec.y, orig.vec.z);
-            }
+            target.set(tx + noiseX, ty + breathe + noiseY, tz + noiseZ);
 
             posAttr[ix] = THREE.MathUtils.lerp(px, target.x, 0.1);
             posAttr[ix+1] = THREE.MathUtils.lerp(py, target.y, 0.1);
             posAttr[ix+2] = THREE.MathUtils.lerp(pz, target.z, 0.1);
             
-            // THRESHOLD RENDERING (Conexiones Periféricas)
+            // Conexiones periféricas por distancia (Threshold)
             for(let j = i + 1; j < nodesCount; j++) {
                 const jx = j * 3;
                 const dx = posAttr[ix] - posAttr[jx];
@@ -519,7 +518,7 @@ function App() {
             linesArray[k] = 0;
         }
         
-        // ACTUALIZAR CORE LINKS (Sinapsis)
+        // Sinapsis neuronales hacia el centro
         let coreLineIndex = 0;
         for (let k = 0; k < coreLinks.length; k++) {
             const link = coreLinks[k];
@@ -527,8 +526,8 @@ function App() {
             const ny = posAttr[link.nodeIndex * 3 + 1];
             const nz = posAttr[link.nodeIndex * 3 + 2];
             
-            // Vibración orgánica de la sinapsis
-            const synapticTwitch = hasTraffic ? Math.sin(elapsedTime * 15.0 + k) * 0.15 : 0;
+            // Vibración orgánica de la sinapsis acelerada por la entropía
+            const synapticTwitch = Math.sin(virtualTime * 14.0 + k) * (0.05 + entropy * 0.35);
             
             const o0 = link.offsets[0];
             const o1 = link.offsets[1];
