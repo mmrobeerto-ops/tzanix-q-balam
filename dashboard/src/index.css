@@ -171,6 +171,24 @@ body {
   pointer-events: auto;
 }
 
+.close-raw-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: #8B949E;
+  font-size: 1.8rem;
+  cursor: pointer;
+  z-index: 100;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.close-raw-btn:hover {
+  color: #FF0055;
+}
+
 .raw-panel-section {
   flex: 1;
   display: flex;

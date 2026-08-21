@@ -762,6 +762,9 @@ function App() {
           </>
         ) : (
           <div className="raw-data-panel">
+            <button className="close-raw-btn" onClick={() => setViewMode('HOLOGRAPHIC')} title="Cerrar Vista">
+              &times;
+            </button>
             <div className="raw-panel-section">
               <h2>&gt;_ Live Traffic Analysis</h2>
               <div className="large-terminal terminal">
