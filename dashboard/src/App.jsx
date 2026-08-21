@@ -600,17 +600,9 @@ function App() {
 
     let pathD = `M 0,${height - (entropyHistory[0] * height)}`;
     for (let i = 1; i < entropyHistory.length; i++) {
-      const x0 = ((i - 1) / (entropyHistory.length - 1)) * width;
-      const y0 = height - (entropyHistory[i - 1] * height);
       const x1 = (i / (entropyHistory.length - 1)) * width;
       const y1 = height - (entropyHistory[i] * height);
-      
-      const cp1x = x0 + (x1 - x0) / 2;
-      const cp1y = y0;
-      const cp2x = x0 + (x1 - x0) / 2;
-      const cp2y = y1;
-      
-      pathD += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x1},${y1}`;
+      pathD += ` L ${x1},${y1}`;
     }
     
     const fillD = pathD + ` L ${width},${height} L 0,${height} Z`;
@@ -624,16 +616,16 @@ function App() {
             <stop offset="100%" stopColor={isAlertColor ? "#FF2E63" : "#00F0FF"} />
           </linearGradient>
           <linearGradient id="gradientFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={isAlertColor ? "rgba(255, 46, 99, 0.45)" : "rgba(0, 240, 255, 0.25)"} />
+            <stop offset="0%" stopColor={isAlertColor ? "rgba(255, 46, 99, 0.35)" : "rgba(0, 240, 255, 0.15)"} />
             <stop offset="100%" stopColor="transparent" />
           </linearGradient>
           <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
         <path fill="url(#gradientFill)" d={fillD} style={{ transition: 'fill 0.3s ease' }} />
-        <path fill="none" stroke="url(#gradientLine)" strokeWidth="2.5" d={pathD} filter="url(#neonGlow)" style={{ transition: 'stroke 0.3s ease' }} />
+        <path fill="none" stroke="url(#gradientLine)" strokeWidth="1.2" d={pathD} filter="url(#neonGlow)" style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
     );
   };
@@ -744,24 +736,24 @@ function App() {
                   </button>
                 </div>
               </div>
-              
-            </div>
 
-            {/* RIGHT PANEL - CONSOLE */}
-            <div className="panel right-panel glass-panel console-panel">
-              <div className="terminal">
-                {logs.map(log => {
-                  const hasBracket = log.msg.startsWith('[');
-                  const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
-                  return (
-                    <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
-                      <span className="time">{timeStr}</span>
-                      <span className="msg">{log.msg}</span>
-                    </div>
-                  );
-                })}
-                {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">System initializing...</span></div>}
+              {/* RIGHT PANEL - CONSOLE */}
+              <div className="panel right-panel glass-panel console-panel">
+                <div className="terminal">
+                  {logs.map(log => {
+                    const hasBracket = log.msg.startsWith('[');
+                    const timeStr = hasBracket ? '> ' : `> [${log.time}] `;
+                    return (
+                      <div key={log.id} className={`log-entry ${log.type.toLowerCase()}`}>
+                        <span className="time">{timeStr}</span>
+                        <span className="msg">{log.msg}</span>
+                      </div>
+                    );
+                  })}
+                  {logs.length === 0 && <div className="log-entry info"><span className="time">{'>'}</span><span className="msg">System initializing...</span></div>}
+                </div>
               </div>
+              
             </div>
           </>
         ) : (
