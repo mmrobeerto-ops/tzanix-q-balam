@@ -648,6 +648,7 @@ function App() {
 
   const getFrequency = () => {
     if (isAlertState) return '9,850';
+    if (mode === 'DEMO' && !demoRunning) return '0';
     return (5000 + Math.floor(Math.random() * 100)).toLocaleString('en-US');
   };
 
