@@ -175,11 +175,15 @@ function App() {
     globalEntropyRef.current = entropyPct;
     setStats(prev => ({ ...prev, globalEntropy: entropyPct }));
     
-    appendLog(`ALERTA: Pico de Entropía (${entropy.toFixed(2)} Shannon). Inyectando Vector de Exfiltración...`, 'CRITICAL');
+    appendLog(`[!] ALERTA: Pico de Entropía detectado (0.92)`, 'CRITICAL');
+    
+    setTimeout(() => {
+      appendLog(`[+] Origen: Inyección SQL masiva detectada`, 'WARN');
+    }, 150);
 
     setTimeout(() => {
       setActiveGate('GATE2_KILL');
-      appendLog(`ACCIÓN: TZANiX Motor Inercial activó Kill-Switch ATR. IP ${ip} Aislada (0.42ms).`, 'SUCCESS');
+      appendLog(`[X] Conexión abortada a nivel Kernel.`, 'SUCCESS');
       setStats(prev => {
         const updated = new Set(prev.blockedIPs);
         updated.add(ip);
@@ -193,7 +197,7 @@ function App() {
       setActiveGate('GATE2_RESTORE');
       globalEntropyRef.current = 0.12;
       setStats(prev => ({ ...prev, globalEntropy: 0.12 }));
-      appendLog(`ESTADO: Red protegida. Pérdida de datos: 0.00%. Latencia Proxy: 0.38ms.`, 'INFO');
+      appendLog(`[-] Tiempo de reacción: 0.38ms (Base de datos a salvo)`, 'INFO');
     }, 2500);
 
     setTimeout(() => setActiveGate(null), 4000);
@@ -639,18 +643,18 @@ function App() {
     if (activeGate === 'GATE2_ATTACK') return 'ANOMALÍA DETECTADA';
     if (activeGate === 'GATE2_KILL') return 'EXFILTRACIÓN BLOQUEADA';
     if (activeGate === 'GATE2_RESTORE') return 'RESTAURANDO ESTADO...';
-    return 'NÚCLEO PROTEGIDO';
+    return 'DB SIDECAR ACTIVO';
   };
 
   const isAlertState = activeGate === 'GATE2_ATTACK' || activeGate === 'GATE2_KILL';
   
   const getLatency = () => {
-    return '0.38';
+    return '0.42';
   };
 
   const getFrequency = () => {
-    if (isAlertState) return '98.50';
-    return (5.00 + Math.random()*0.1).toFixed(2);
+    if (isAlertState) return '9,850';
+    return (5000 + Math.floor(Math.random() * 100)).toLocaleString('en-US');
   };
 
   return (
@@ -672,7 +676,7 @@ function App() {
                 <span>ESTADO: {getStatusText()}</span>
              </div>
              <div className="separator">|</div>
-             <div className="latency-indicator">LATENCY: {getLatency()}ms</div>
+             <div className="latency-indicator">KILL-SWITCH LATENCY: {getLatency()}ms</div>
           </div>
 
           <div className="controls">
@@ -680,8 +684,8 @@ function App() {
               {viewMode === 'HOLOGRAPHIC' ? '[ VISTA DATOS RAW ]' : '[ VISTA HOLOGRÁFICA ]'}
             </button>
             <select className="mode-select" value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="DEMO">MODE: DEMO</option>
-              <option value="PROD">MODE: LIVE WEBSOCKET</option>
+              <option value="DEMO">MODE: SHADOW (AUDITORÍA)</option>
+              <option value="PROD">MODE: ENFORCEMENT (BLOQUEO ACTIVO)</option>
             </select>
           </div>
         </header>
@@ -693,21 +697,21 @@ function App() {
               
               {/* LEFT PANEL - METRICS */}
               <div className="panel left-panel glass-panel">
-                <h3>Entropy Wave (ATR)</h3>
+                <h3>SHANNON ENTROPY WAVE</h3>
                 <div className="entropy-graph-container">
                   {renderEntropyGraph()}
                 </div>
                 <ul className="metrics-list">
                   <li>
-                    <span className="label">- Frecuencia:</span>
-                    <span className="val">{getFrequency()} Hz</span>
+                    <span className="label">- DB Query Rate (QPS):</span>
+                    <span className="val">{getFrequency()}</span>
                   </li>
                   <li>
-                    <span className="label">- Entropía:</span>
-                    <span className="val">{isAlertState ? '0.98' : stats.globalEntropy.toFixed(2)}</span>
+                    <span className="label">- Nivel de Entropía:</span>
+                    <span className="val">{isAlertState ? '0.98 (CRÍTICO)' : `${stats.globalEntropy.toFixed(2)} (Normal)`}</span>
                   </li>
                   <li>
-                    <span className="label">- Conexiones:</span>
+                    <span className="label">- Conexiones DB:</span>
                     <span className="val">{stats.activeConnections.toLocaleString()}</span>
                   </li>
                 </ul>
@@ -737,7 +741,7 @@ function App() {
                     onClick={() => executeGate2()}
                     disabled={!!activeGate}
                   >
-                    {activeGate ? '[ SISTEMA EN RESPUESTA ]' : '[ SIMULAR ATAQUE ]'}
+                    {activeGate ? '[ SISTEMA EN RESPUESTA ]' : '[ SIMULAR EXFILTRACIÓN DE DATOS ]'}
                   </button>
                 </div>
               </div>
