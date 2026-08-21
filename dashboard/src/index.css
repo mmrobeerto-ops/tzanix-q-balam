@@ -443,3 +443,58 @@ body {
 .log-entry.warn .msg { color: #FF2E63; }
 .log-entry.critical .msg { color: #FF2E63; font-weight: bold; }
 .log-entry.success .msg { color: #00E5FF; }
+
+/* RESPONSIVE DESIGN FOR TABLETS AND MOBILE */
+@media (max-width: 1024px) {
+  .hud-overlay {
+    padding: 1rem;
+    overflow-y: auto;
+    pointer-events: auto;
+  }
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    height: auto;
+  }
+  .top-metrics, .controls {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 0.5rem;
+  }
+  .middle-section {
+    flex-direction: column;
+    gap: 2rem;
+    align-items: stretch;
+  }
+  .left-panel, .right-panel {
+    width: 100%;
+    max-width: 100%;
+    align-self: stretch;
+  }
+  .center-actions {
+    margin-top: 2rem;
+    align-self: center;
+  }
+  .toolbar-panel {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .raw-data-panel {
+    flex-direction: column;
+    overflow-y: auto;
+    top: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    gap: 1rem;
+  }
+  .raw-panel-section {
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+    padding-right: 0;
+    padding-bottom: 1rem;
+  }
+}
