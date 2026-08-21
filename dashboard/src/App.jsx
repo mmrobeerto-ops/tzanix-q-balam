@@ -205,10 +205,10 @@ function App() {
 
 
   // Referencias para leer el estado dentro del loop de animación sin reiniciar Three.js
-  const engineState = useRef({ activeGate: null, demoRunning: false, globalEntropy: 0.12 });
+  const engineState = useRef({ activeGate: null, demoRunning: false, globalEntropy: 0.12, mode: 'DEMO' });
   useEffect(() => {
-    engineState.current = { activeGate, demoRunning, globalEntropy: stats.globalEntropy };
-  }, [activeGate, demoRunning, stats.globalEntropy]);
+    engineState.current = { activeGate, demoRunning, globalEntropy: stats.globalEntropy, mode };
+  }, [activeGate, demoRunning, stats.globalEntropy, mode]);
 
   // --- INICIALIZACIÓN 3D ---
   useEffect(() => {
@@ -401,14 +401,17 @@ function App() {
       const gate = engineState.current.activeGate;
       const isDemoRunning = engineState.current.demoRunning;
       const entropy = engineState.current.globalEntropy; // Rango 0.12 a 0.98
+      const currentMode = engineState.current.mode;
 
-      // Parámetros reactivos basados en la señal de entropía real
-      const speedMult = 0.6 + (entropy * 3.5); // Aceleración del flujo temporal virtual
-      const rotationSpeed = 0.0008 + (entropy * 0.015); // Velocidad de giro tridimensional
-      const turbulence = entropy > 0.4 ? (entropy * 0.35) : (entropy * 0.04); // Deformación del campo cuántico
-      const bloomStrength = 0.5 + (entropy * 1.5); // Glow e intensidad del bloom
-      const pulseSpeed = 4.0 + (entropy * 12.0); // Ritmo de pulsación del núcleo
-      const pulseAmplitude = 0.04 + (entropy * 0.10); // Tamaño del latido
+      const isPaused = currentMode === 'DEMO' && !isDemoRunning;
+
+      // Parámetros reactivos basados en la señal de entropía real (se congelan a 0 si está pausado)
+      const speedMult = isPaused ? 0 : (0.6 + (entropy * 3.5)); // Aceleración del flujo temporal virtual
+      const rotationSpeed = isPaused ? 0 : (0.0008 + (entropy * 0.015)); // Velocidad de giro tridimensional
+      const turbulence = isPaused ? 0 : (entropy > 0.4 ? (entropy * 0.35) : (entropy * 0.04)); // Deformación del campo cuántico
+      const bloomStrength = isPaused ? 0.3 : (0.5 + (entropy * 1.5)); // Brillo atenuado en pausa
+      const pulseSpeed = isPaused ? 0 : (4.0 + (entropy * 12.0)); // Ritmo de pulsación del núcleo
+      const pulseAmplitude = isPaused ? 0 : (0.04 + (entropy * 0.10)); // Tamaño del latido
 
       const delta = clock.getDelta();
       virtualTime += delta * speedMult;
