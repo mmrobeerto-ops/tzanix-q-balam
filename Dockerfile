@@ -1,5 +1,5 @@
 # Etapa 1: Construcción del Dashboard (Node.js)
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app/dashboard
 COPY dashboard/package*.json ./
 RUN npm install
