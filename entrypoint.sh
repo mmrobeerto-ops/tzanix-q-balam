@@ -3,6 +3,11 @@
 # Obtener fecha actual en segundos Epoch
 CURRENT_DATE=$(date +%s)
 
+# Si BUILD_DATE no es numérico, usar la fecha actual como fallback
+case "$BUILD_DATE" in
+    ''|*[!0-9]*) BUILD_DATE=$CURRENT_DATE ;;
+esac
+
 # Calcular los segundos transcurridos desde que se construyó la imagen
 ELAPSED=$((CURRENT_DATE - BUILD_DATE))
 
