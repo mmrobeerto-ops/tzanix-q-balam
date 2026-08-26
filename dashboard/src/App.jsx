@@ -66,7 +66,7 @@ function App() {
 
   const [mode, setMode] = useState('DEMO'); 
   const [demoRunning, setDemoRunning] = useState(true); // Tráfico base siempre activo por defecto
-  const [wsUrl, setWsUrl] = useState(`ws://${window.location.hostname}:8081`);
+  const [wsUrl, setWsUrl] = useState(`ws://${window.location.hostname}:8081/ws`);
   const [viewMode, setViewMode] = useState('HOLOGRAPHIC'); // HOLOGRAPHIC | RAW_DATA
 
   const [entropyHistory, setEntropyHistory] = useState(Array(60).fill(0.12));
@@ -720,7 +720,7 @@ function App() {
                         className="ws-input" 
                         value={wsUrl} 
                         onChange={(e) => setWsUrl(e.target.value)} 
-                        placeholder={`ws://${window.location.hostname}:8081`}
+                        placeholder={`ws://${window.location.hostname}:8081/ws`}
                       />
                   )}
                   {mode === 'DEMO' && (
